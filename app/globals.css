@@ -1,0 +1,286 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ── Inventory tokens ────────────────────────────────────────────────
+   EVOQ Inventory palette: pink marks actions, links and the active state,
+   coral is kept for selective emphasis. Everything else runs on neutral
+   grey ink, a near-white canvas, white panels and an off-white sidebar,
+   so brand colour stays a small share of the screen (same system as Desk
+   and Projects). */
+:root {
+  /* Official palette */
+  --inventory-depth: #7d1149;
+  --inventory: #c91f6d;
+  --inventory-action: #f15b5a;
+  --inventory-hover: #e89b98;
+  --inventory-soft: #f8c8b8;
+  --inventory-tint: #f6dce5;
+  --inventory-surface: #fcefef;
+
+  /* Brand roles, named as in the Projects app so shared patterns carry over */
+  --brand-depth: #101828; /* ink */
+  --brand: var(--inventory);
+  --brand-action: var(--inventory);
+  --brand-hover: var(--inventory-hover);
+  --brand-soft: var(--inventory-soft);
+  --brand-tint: var(--inventory-tint);
+  --brand-surface: #fdf7f8;
+  --brand-10: rgb(201 31 109 / 0.08);
+  --brand-depth-10: rgb(16 24 40 / 0.05);
+  --brand-press: color-mix(in srgb, var(--inventory) 82%, var(--inventory-depth));
+  --coral: var(--inventory-action);
+  --coral-10: rgb(241 91 90 / 0.1);
+
+  /* Chart series — validated pair (pink / coral) on white */
+  --series-received: #c91f6d;
+  --series-issued: #e9773f;
+
+  /* Semantic states */
+  --success: #067647;
+  --success-bg: #ecfdf3;
+  --warning: #b54708;
+  --warning-bg: #fffaeb;
+  --danger: #b42318;
+  --danger-bg: #fef3f2;
+  --neutral-fg: #475467;
+  --neutral-bg: #f2f4f7;
+  --info: #175cd3;
+  --info-bg: #eff8ff;
+
+  --sidebar-w: 248px;
+  --sidebar-w-collapsed: 72px;
+  --header-h: 64px;
+
+  --ink: var(--brand-depth);
+  --ink-body: #344054;
+  --ink-muted: #667085;
+  --ink-faint: #98a2b3;
+  --border-color: #e9eaf0;
+  --border-soft: #f0f1f5;
+  --bg-page: #f8f9fb;
+  --bg-card: #ffffff;
+  --bg-sidebar: #ffffff;
+  --card-shadow: 0 1px 2px rgb(16 24 40 / 0.03), 0 1px 3px rgb(16 24 40 / 0.03);
+  --pop-shadow: 0 12px 40px rgb(16 24 40 / 0.12);
+
+  /* shadcn/ui tokens mapped onto the Inventory palette */
+  --background: var(--bg-page);
+  --foreground: var(--ink);
+  --card: var(--bg-card);
+  --card-foreground: var(--ink);
+  --popover: #ffffff;
+  --popover-foreground: var(--ink);
+  --primary: var(--brand);
+  --primary-foreground: #ffffff;
+  --secondary: var(--brand-tint);
+  --secondary-foreground: var(--ink);
+  --muted: #f2f4f7;
+  --muted-foreground: var(--ink-muted);
+  --accent: var(--brand-surface);
+  --accent-foreground: var(--ink);
+  --destructive: #dc2626;
+  --border: var(--border-color);
+  --input: var(--border-color);
+  --ring: var(--brand-action);
+  --radius: 0.625rem;
+
+  --sidebar: var(--bg-sidebar);
+  --sidebar-foreground: var(--ink);
+  --sidebar-primary: var(--brand);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: var(--brand-10);
+  --sidebar-accent-foreground: var(--ink);
+  --sidebar-border: var(--border-color);
+  --sidebar-ring: var(--brand-action);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-heading: var(--font-sans);
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --color-inventory-depth: var(--inventory-depth);
+  --color-inventory: var(--inventory);
+  --color-inventory-action: var(--inventory-action);
+  --color-inventory-hover: var(--inventory-hover);
+  --color-inventory-soft: var(--inventory-soft);
+  --color-inventory-tint: var(--inventory-tint);
+  --color-inventory-surface: var(--inventory-surface);
+
+  --color-brand-depth: var(--brand-depth);
+  --color-brand: var(--brand);
+  --color-brand-action: var(--brand-action);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-soft: var(--brand-soft);
+  --color-brand-tint: var(--brand-tint);
+  --color-brand-surface: var(--brand-surface);
+  --color-brand-10: var(--brand-10);
+  --color-brand-depth-10: var(--brand-depth-10);
+  --color-brand-press: var(--brand-press);
+  --color-coral: var(--coral);
+  --color-coral-10: var(--coral-10);
+
+  --color-ink: var(--ink);
+  --color-ink-body: var(--ink-body);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-faint: var(--ink-faint);
+  --color-line: var(--border-color);
+  --color-line-soft: var(--border-soft);
+
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.2);
+  --radius-2xl: calc(var(--radius) * 1.6);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* ── Typography scale — same scale as Desk and Projects ── */
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+  --text-display: 28px;
+  --text-display--line-height: 36px;
+  --text-display--font-weight: 600;
+  --text-h1: 20px;
+  --text-h1--line-height: 28px;
+  --text-h1--font-weight: 600;
+  --text-h2: 16px;
+  --text-h2--line-height: 24px;
+  --text-h2--font-weight: 600;
+  --text-label: 14px;
+  --text-label--line-height: 20px;
+  --text-label--font-weight: 500;
+  --text-body: 14px;
+  --text-body--line-height: 22px;
+  --text-caption: 12px;
+  --text-caption--line-height: 16px;
+  --text-nav-item: 14px;
+  --text-nav-item--line-height: 20px;
+  --text-nav-item--font-weight: 500;
+  --text-nav-group-label: 11px;
+  --text-nav-group-label--line-height: 16px;
+  --text-nav-group-label--font-weight: 500;
+  --text-nav-group-label--letter-spacing: 0.06em;
+  --text-table-header: 12px;
+  --text-table-header--line-height: 16px;
+  --text-table-header--font-weight: 500;
+  --text-table-cell: 14px;
+  --text-table-cell--line-height: 20px;
+  --text-table-cell-secondary: 12px;
+  --text-table-cell-secondary--line-height: 16px;
+  --text-field-label: 13px;
+  --text-field-label--line-height: 18px;
+  --text-field-label--font-weight: 500;
+  --text-button: 14px;
+  --text-button--line-height: 20px;
+  --text-button--font-weight: 500;
+  --text-button-sm: 13px;
+  --text-button-sm--line-height: 18px;
+  --text-button-sm--font-weight: 500;
+  --text-card-title: 16px;
+  --text-card-title--line-height: 24px;
+  --text-card-title--font-weight: 600;
+  --text-badge: 12px;
+  --text-badge--line-height: 16px;
+  --text-badge--font-weight: 500;
+
+  --shadow-card: var(--card-shadow);
+  --shadow-pop: var(--pop-shadow);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans;
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    background-color: var(--bg-page);
+    color: var(--ink-body);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  ::selection {
+    background: var(--inventory-tint);
+    color: var(--inventory-depth);
+  }
+  :focus-visible {
+    outline: 2px solid var(--brand-action);
+    outline-offset: 2px;
+  }
+  [data-slot]:focus-visible {
+    outline: none;
+  }
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+}
+
+@layer utilities {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: #d0d5dd transparent;
+  }
+  .scrollbar-none {
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Content area offset by the fixed header and the (desktop) sidebar, which can collapse to a rail. */
+.app-content {
+  padding-top: 60px;
+}
+@media (min-width: 1024px) {
+  .app-content {
+    padding-top: var(--header-h);
+    margin-left: var(--sidebar-w);
+  }
+  [data-sidebar="collapsed"] .app-content {
+    margin-left: var(--sidebar-w-collapsed);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
