@@ -23,7 +23,7 @@ export interface Tone {
   dot: boolean;
 }
 
-const tone = (label: string, fg: string, bg: string, dot = true): Tone => ({ label, fg, bg, dot });
+export const tone = (label: string, fg: string, bg: string, dot = true): Tone => ({ label, fg, bg, dot });
 
 export const STATUS_META: Record<DisplayStatus, Tone> = {
   "in-stock": tone("In Stock", "var(--success)", "var(--success-bg)"),

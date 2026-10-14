@@ -12,3 +12,33 @@ export const getItemsListHref = () => itemsListHref;
 export const setItemsListHref = (href: string) => {
   itemsListHref = href;
 };
+
+/** Module list routes (match the sidebar). */
+export const ROUTES = {
+  categories: "/categories",
+  warehouses: "/warehouses",
+  transfers: "/stock-transfers",
+  adjustments: "/stock-adjustments",
+  stocktakes: "/stocktakes",
+  barcodes: "/barcodes",
+  vendors: "/vendors",
+  purchaseOrders: "/purchase-orders",
+  goodsReceipts: "/goods-receipts",
+  supplierBills: "/supplier-bills",
+  customers: "/customers",
+  salesOrders: "/sales-orders",
+  fulfilment: "/fulfilment",
+  salesReturns: "/sales-returns",
+  reports: "/reports",
+  reorderAlerts: "/reorder-alerts",
+  valuation: "/inventory-valuation",
+  movements: "/stock-movements",
+  users: "/users",
+  settings: "/settings",
+} as const;
+
+export type ModuleKey = keyof typeof ROUTES;
+
+/** Detail page of a record in a module: /purchase-orders/po-1042 */
+export const recordHref = (module: ModuleKey, id: string) => `${ROUTES[module]}/${encodeURIComponent(id)}`;
+export const newHref = (module: ModuleKey, params?: Record<string, string>) => `${ROUTES[module]}/new${params ? `?${new URLSearchParams(params)}` : ""}`;

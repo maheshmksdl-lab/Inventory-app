@@ -169,7 +169,8 @@ export function ItemForm({
   const price = Number(values.sellingPrice);
   const pricesValid = values.costPrice !== "" && values.sellingPrice !== "" && !errors.costPrice && !errors.sellingPrice && Number.isFinite(cost) && Number.isFinite(price);
   const margin = pricesValid && price > 0 ? ((price - cost) / price) * 100 : null;
-  const opt = (list: string[] | undefined) => (list ?? []).map((v) => ({ value: v, label: v }));
+  // An item may sit in a category or brand that has since been archived: keep it selectable.
+  const opt = (list: string[] | undefined, current?: string) => [...(list ?? []), ...(current && list && !list.includes(current) ? [current] : [])].map((v) => ({ value: v, label: v }));
 
   return (
     <form
@@ -198,10 +199,10 @@ export function ItemForm({
           {input("barcode", { placeholder: "e.g. 8904471000107", inputMode: "numeric", autoComplete: "off", className: cn(fieldClass, "font-mono") })}
         </FormField>
         <FormField label="Category" htmlFor="item-category" error={errors.category} required>
-          {select("category", opt(lookups?.categories), "Choose a category")}
+          {select("category", opt(lookups?.categories, initial.category), "Choose a category")}
         </FormField>
         <FormField label="Brand" htmlFor="item-brand" error={errors.brand} required>
-          {select("brand", opt(lookups?.brands), "Choose a brand")}
+          {select("brand", opt(lookups?.brands, initial.brand), "Choose a brand")}
         </FormField>
         <FormField label="Item type" htmlFor="item-type" error={errors.type} required>
           {select(
@@ -267,7 +268,7 @@ export function ItemForm({
         </FormField>
         {mode === "create" && (
           <p className="rounded-lg bg-[#F9FAFB] px-3 py-2.5 text-[12.5px] leading-5 text-ink-body sm:col-span-2">
-            New items start with no stock. Opening stock will be recorded through Goods Receipts or Stock Adjustments, which are coming soon.
+            New items start with no stock. In a live system opening stock is recorded through Goods Receipts or Stock Adjustments; in this prototype those screens save demo records only and never change stock balances.
           </p>
         )}
       </Section>

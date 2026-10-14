@@ -6,9 +6,10 @@
  */
 import { addDays, nowIso } from "@/lib/format";
 import { available, OPEN_SO, PENDING_PO, PO_STATUSES, SO_STATUSES, stockStatusOf, toRow } from "@/lib/inventory-meta";
-import { DEMO_TODAY, PURCHASE_ORDER_COUNTS, SALES_ORDER_COUNTS, seedMovements } from "@/lib/mock-data/movements";
-import { BRANDS, CATEGORIES, seedProducts, TAX_CLASSES, UNITS } from "@/lib/mock-data/products";
+import { DEMO_TODAY } from "@/lib/mock-data/movements";
+import { TAX_CLASSES } from "@/lib/mock-data/products";
 import { VENDORS, WAREHOUSE_IDS, WAREHOUSES } from "@/lib/mock-data/warehouses";
+import { clone, collections, CURRENT_USER, delay, movements, products, settings } from "./store";
 import type { ItemInput, ItemQuery } from "@/lib/schemas/item";
 import type {
   DashboardData,
@@ -26,21 +27,8 @@ import type {
   WarehouseScope,
 } from "@/lib/types/inventory";
 
-/** Simulated network latency. */
-const delay = (ms = 120 + Math.random() * 180) => new Promise((r) => setTimeout(r, ms));
-
 let seq = 0;
 const newId = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${++seq}`;
-
-/** Who is signed in to the demo. */
-const CURRENT_USER = "Admin User";
-
-let productStore: Product[] | null = null;
-let movementStore: StockMovement[] | null = null;
-const products = () => (productStore ??= seedProducts());
-const movements = () => (movementStore ??= seedMovements(products()));
-
-const clone = <T>(v: T): T => structuredClone(v);
 
 export class ApiError extends Error {
   constructor(
@@ -62,9 +50,24 @@ export interface Lookups {
   taxClasses: string[];
 }
 
+/** Categories and brands come from Categories & Brands (active entries only); units from Settings. */
 export async function getLookups(): Promise<Lookups> {
   await delay(60);
-  return clone({ warehouses: WAREHOUSES, vendors: VENDORS, categories: CATEGORIES, brands: BRANDS, units: UNITS, taxClasses: TAX_CLASSES });
+  const { categories, brands } = collections();
+  const names = (list: typeof categories) => list.filter((c) => c.status === "active").map((c) => c.name);
+  return clone({ warehouses: WAREHOUSES, vendors: VENDORS, categories: names(categories), brands: names(brands), units: settings().units, taxClasses: TAX_CLASSES });
+}
+
+/** Every product with totals for a scope (archived included; callers filter). */
+export async function listProducts(scope: WarehouseScope = "all"): Promise<ProductRow[]> {
+  await delay(80);
+  return clone(products().map((p) => toRow(p, scope)));
+}
+
+/** The full stock movement ledger, newest first. */
+export async function listMovements(): Promise<StockMovement[]> {
+  await delay();
+  return clone(movements());
 }
 
 // ── Items ────────────────────────────────────────────────────────────
@@ -314,11 +317,12 @@ export async function getDashboard(scope: WarehouseScope, days: number): Promise
     .sort((a, b) => b.quantity - a.quantity)
     .slice(0, 5);
 
-  const scopedWh: WarehouseId[] = scope === "all" ? WAREHOUSE_IDS : [scope];
-  const sumCounts = <S extends string>(table: Record<WarehouseId, Record<S, number>>, statuses: { value: S }[]) =>
-    Object.fromEntries(statuses.map((s) => [s.value, scopedWh.reduce((n, w) => n + table[w][s.value], 0)])) as Record<S, number>;
-  const purchaseOrders = sumCounts<PurchaseOrderStatus>(PURCHASE_ORDER_COUNTS, PO_STATUSES);
-  const salesOrders = sumCounts<SalesOrderStatus>(SALES_ORDER_COUNTS, SO_STATUSES);
+  // Counted from the Purchase Orders and Sales Orders lists, so the dashboard always agrees with them.
+  const scopedWh: string[] = scope === "all" ? WAREHOUSE_IDS : [scope];
+  const countBy = <S extends string>(docs: { status: S; warehouseId: string }[], statuses: { value: S }[]) =>
+    Object.fromEntries(statuses.map((s) => [s.value, docs.filter((d) => d.status === s.value && scopedWh.includes(d.warehouseId)).length])) as Record<S, number>;
+  const purchaseOrders = countBy<PurchaseOrderStatus>(collections().purchaseOrders, PO_STATUSES);
+  const salesOrders = countBy<SalesOrderStatus>(collections().salesOrders, SO_STATUSES);
 
   const live = all.filter((p) => p.lifecycle !== "archived");
   const warehouses = WAREHOUSES.map((w) => {

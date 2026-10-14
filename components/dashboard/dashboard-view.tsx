@@ -23,7 +23,7 @@ import {
 import { toast } from "sonner";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Card, CardHeader, fieldClass, OutlineButton, PageHeading, PageShell, SoonTag } from "@/components/shared/inventory-ui";
+import { Card, CardHeader, fieldClass, OutlineButton, PageHeading, PageShell } from "@/components/shared/inventory-ui";
 import { KpiCard } from "@/components/shared/kpi-card";
 import { ErrorState } from "@/components/shared/state-panels";
 import { WarehouseSelect } from "@/components/shared/warehouse-select";
@@ -46,11 +46,11 @@ const RANGES = [
 type RangeDays = (typeof RANGES)[number]["days"];
 const DEFAULT_RANGE: RangeDays = 7;
 
-/** Create actions; only items can be created in this phase. */
-const PLANNED = [
-  { label: "Purchase Order", icon: ShoppingCartIcon },
-  { label: "Stock Transfer", icon: ArrowsLeftRightIcon },
-  { label: "Stock Adjustment", icon: SlidersHorizontalIcon },
+/** Create actions (documents are saved as demo records; none move stock). */
+const CREATE = [
+  { label: "Purchase Order", icon: ShoppingCartIcon, href: "/purchase-orders/new" },
+  { label: "Stock Transfer", icon: ArrowsLeftRightIcon, href: "/stock-transfers/new" },
+  { label: "Stock Adjustment", icon: SlidersHorizontalIcon, href: "/stock-adjustments?new=1" },
 ];
 
 function QuickActions() {
@@ -68,9 +68,11 @@ function QuickActions() {
             <PackageIcon aria-hidden /> Add Item
           </Link>
         </DropdownMenuItem>
-        {PLANNED.map(({ label, icon: IconCmp }) => (
-          <DropdownMenuItem key={label} disabled>
-            <IconCmp aria-hidden /> Create {label} <SoonTag />
+        {CREATE.map(({ label, icon: IconCmp, href }) => (
+          <DropdownMenuItem key={label} asChild>
+            <Link href={href}>
+              <IconCmp aria-hidden /> Create {label}
+            </Link>
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>
@@ -99,9 +101,11 @@ function NewMenu() {
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        {[...PLANNED, { label: "Sales Order", icon: ShoppingBagIcon }].map(({ label, icon: IconCmp }) => (
-          <DropdownMenuItem key={label} disabled>
-            <IconCmp aria-hidden /> {label} <SoonTag />
+        {[...CREATE, { label: "Sales Order", icon: ShoppingBagIcon, href: "/sales-orders/new" }].map(({ label, icon: IconCmp, href }) => (
+          <DropdownMenuItem key={label} asChild>
+            <Link href={href}>
+              <IconCmp aria-hidden /> {label}
+            </Link>
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>

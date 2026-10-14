@@ -28,8 +28,6 @@ export interface NavItem {
   label: string;
   href: string;
   icon: Icon;
-  /** False until the module's screens exist: shown, but not a link. */
-  available: boolean;
 }
 
 export interface NavGroup {
@@ -37,52 +35,53 @@ export interface NavGroup {
   items: NavItem[];
 }
 
-const soon = (label: string, href: string, icon: Icon): NavItem => ({ label, href, icon, available: false });
-
 export const NAV_GROUPS: NavGroup[] = [
-  { label: "Overview", items: [{ label: "Dashboard", href: "/dashboard", icon: SquaresFourIcon, available: true }] },
+  { label: "Overview", items: [{ label: "Dashboard", href: "/dashboard", icon: SquaresFourIcon }] },
   {
     label: "Inventory",
     items: [
-      { label: "Items & Products", href: "/items", icon: PackageIcon, available: true },
-      soon("Categories & Brands", "/categories", TagIcon),
-      soon("Warehouses & Locations", "/warehouses", WarehouseIcon),
-      soon("Stock Transfers", "/transfers", ArrowsLeftRightIcon),
-      soon("Stock Adjustments", "/adjustments", SlidersHorizontalIcon),
-      soon("Stocktakes / Counts", "/stocktakes", ClipboardTextIcon),
-      soon("Barcode & QR Codes", "/barcodes", BarcodeIcon),
+      { label: "Items & Products", href: "/items", icon: PackageIcon },
+      { label: "Categories & Brands", href: "/categories", icon: TagIcon },
+      { label: "Warehouses & Locations", href: "/warehouses", icon: WarehouseIcon },
+      { label: "Stock Transfers", href: "/stock-transfers", icon: ArrowsLeftRightIcon },
+      { label: "Stock Adjustments", href: "/stock-adjustments", icon: SlidersHorizontalIcon },
+      { label: "Stocktakes / Counts", href: "/stocktakes", icon: ClipboardTextIcon },
+      { label: "Barcode & QR Codes", href: "/barcodes", icon: BarcodeIcon },
     ],
   },
   {
     label: "Purchasing",
     items: [
-      soon("Vendors", "/vendors", StorefrontIcon),
-      soon("Purchase Orders", "/purchase-orders", ShoppingCartIcon),
-      soon("Goods Receipts", "/goods-receipts", TrayArrowDownIcon),
-      soon("Supplier Bills", "/supplier-bills", ReceiptIcon),
+      { label: "Vendors", href: "/vendors", icon: StorefrontIcon },
+      { label: "Purchase Orders", href: "/purchase-orders", icon: ShoppingCartIcon },
+      { label: "Goods Receipts", href: "/goods-receipts", icon: TrayArrowDownIcon },
+      { label: "Supplier Bills", href: "/supplier-bills", icon: ReceiptIcon },
     ],
   },
   {
     label: "Sales & Fulfilment",
     items: [
-      soon("Customers", "/customers", UsersThreeIcon),
-      soon("Sales Orders", "/sales-orders", ShoppingBagIcon),
-      soon("Pick, Pack & Ship", "/fulfilment", TruckIcon),
-      soon("Sales Returns", "/returns", ArrowUUpLeftIcon),
+      { label: "Customers", href: "/customers", icon: UsersThreeIcon },
+      { label: "Sales Orders", href: "/sales-orders", icon: ShoppingBagIcon },
+      { label: "Pick, Pack & Ship", href: "/fulfilment", icon: TruckIcon },
+      { label: "Sales Returns", href: "/sales-returns", icon: ArrowUUpLeftIcon },
     ],
   },
   {
     label: "Insights",
     items: [
-      soon("Reports & Analytics", "/reports", ChartBarIcon),
-      soon("Reorder Alerts", "/reorder-alerts", BellRingingIcon),
-      soon("Inventory Valuation", "/valuation", CoinsIcon),
-      soon("Stock Movement History", "/movements", ClockCounterClockwiseIcon),
+      { label: "Reports & Analytics", href: "/reports", icon: ChartBarIcon },
+      { label: "Reorder Alerts", href: "/reorder-alerts", icon: BellRingingIcon },
+      { label: "Inventory Valuation", href: "/inventory-valuation", icon: CoinsIcon },
+      { label: "Stock Movement History", href: "/stock-movements", icon: ClockCounterClockwiseIcon },
     ],
   },
   {
     label: "Administration",
-    items: [soon("Users & Permissions", "/users", UserGearIcon), soon("Settings & Integrations", "/settings", GearSixIcon)],
+    items: [
+      { label: "Users & Permissions", href: "/users", icon: UserGearIcon },
+      { label: "Settings & Integrations", href: "/settings", icon: GearSixIcon },
+    ],
   },
 ];
 
@@ -91,7 +90,7 @@ const under = (pathname: string, base: string) => pathname === base || pathname.
 /** The nav item and group a path belongs to (for the header title and active row). */
 export function navFor(pathname: string): { item: NavItem; group: NavGroup } | null {
   for (const group of NAV_GROUPS) {
-    for (const item of group.items) if (item.available && under(pathname, item.href)) return { item, group };
+    for (const item of group.items) if (under(pathname, item.href)) return { item, group };
   }
   return null;
 }

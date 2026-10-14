@@ -12,7 +12,7 @@ export const DEMO_TODAY = "2026-10-14";
 const HISTORY_DAYS = 120;
 
 /** Deterministic PRNG (mulberry32). */
-function rng(seed: number) {
+export function rng(seed: number) {
   let a = seed;
   return () => {
     a |= 0;

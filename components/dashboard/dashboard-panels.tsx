@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRightIcon, CheckCircleIcon, ShoppingBagIcon } from "@phosphor-icons/react/dist/ssr";
+import { CheckCircleIcon, ShoppingBagIcon } from "@phosphor-icons/react/dist/ssr";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Card, CardHeader, OutlineButton, StatusBadge, td, th, UnavailableTip, ViewAll } from "@/components/shared/inventory-ui";
+import { Card, CardHeader, StatusBadge, td, th, ViewAll } from "@/components/shared/inventory-ui";
 import { CompactMovementTable, type MovementProduct } from "@/components/shared/movement-table";
 import { ProductThumb } from "@/components/shared/product-thumb";
 import { EmptyState } from "@/components/shared/state-panels";
@@ -25,18 +25,6 @@ function RowsSkeleton({ rows = 5, className }: { rows?: number; className?: stri
         </div>
       ))}
     </div>
-  );
-}
-
-/** "View all" for a module that doesn't exist yet: visible, explained, not a dead link. */
-function ViewAllSoon({ module }: { module: string }) {
-  return (
-    <UnavailableTip reason={`${module} is coming soon`}>
-      <span className="inline-flex items-center gap-1.5 text-[13px] leading-5 font-medium text-ink-faint" aria-hidden>
-        View all
-        <ArrowRightIcon size={13} weight="bold" />
-      </span>
-    </UnavailableTip>
   );
 }
 
@@ -104,11 +92,13 @@ export function LowStockAlerts({ data, className }: { data: DashboardData | unde
                     <StatusBadge status={a.status} className="px-1.5 text-[11.5px]" />
                   </td>
                   <td className={cn(td, "py-2.5 text-right")}>
-                    <UnavailableTip reason="Reordering needs Purchase Orders, which is coming soon">
-                      <OutlineButton disabled className="h-7 px-2.5 text-[12px]">
-                        Reorder
-                      </OutlineButton>
-                    </UnavailableTip>
+                    <Link
+                      href={`/reorder-alerts?q=${encodeURIComponent(a.sku)}`}
+                      className="inline-flex h-7 items-center rounded-lg border border-line bg-white px-2.5 text-[12px] font-medium text-ink-body transition-colors hover:border-[#D0D5DD] hover:bg-[#F9FAFB] hover:text-ink focus-visible:outline-2 focus-visible:outline-brand-action"
+                      aria-label={`Reorder ${a.name}`}
+                    >
+                      Reorder
+                    </Link>
                   </td>
                 </tr>
               ))}
@@ -146,7 +136,7 @@ function StatusList({ title, rows }: { title: string; rows: { value: string; lab
 export function OrderOverview({ data, className }: { data: DashboardData | undefined; className?: string }) {
   return (
     <Card label="Order overview" className={className}>
-      <CardHeader title="Order Overview" subtitle="Current order pipeline · preview" />
+      <CardHeader title="Order Overview" subtitle="Current order pipeline" />
       {!data ? (
         <RowsSkeleton rows={8} />
       ) : (
@@ -154,7 +144,15 @@ export function OrderOverview({ data, className }: { data: DashboardData | undef
           <StatusList title="Purchase Orders" rows={PO_STATUSES.map((s) => ({ ...s, count: data.purchaseOrders[s.value] }))} />
           <div className="border-t border-line-soft" />
           <StatusList title="Sales Orders" rows={SO_STATUSES.map((s) => ({ ...s, count: data.salesOrders[s.value] }))} />
-          <p className="text-[11.5px] leading-4 text-ink-muted">Sample counts. Purchase Orders and Sales Orders modules are coming soon.</p>
+          <p className="flex flex-wrap gap-x-3 text-[11.5px] leading-4 text-ink-muted">
+            Demo counts from the order lists.
+            <Link href="/purchase-orders" className="font-medium text-brand hover:text-brand-press">
+              Purchase Orders
+            </Link>
+            <Link href="/sales-orders" className="font-medium text-brand hover:text-brand-press">
+              Sales Orders
+            </Link>
+          </p>
         </div>
       )}
     </Card>
@@ -166,7 +164,7 @@ export function OrderOverview({ data, className }: { data: DashboardData | undef
 export function RecentMovements({ data, products, className }: { data: DashboardData | undefined; products: Map<string, MovementProduct>; className?: string }) {
   return (
     <Card label="Recent stock movements" className={className}>
-      <CardHeader title="Recent Stock Movements" subtitle="Latest entries in the stock ledger" action={<ViewAllSoon module="Stock Movement History" />} />
+      <CardHeader title="Recent Stock Movements" subtitle="Latest entries in the stock ledger" action={<ViewAll href="/stock-movements" />} />
       {!data ? (
         <RowsSkeleton rows={6} />
       ) : data.recentMovements.length === 0 ? (
@@ -187,7 +185,7 @@ export function WarehouseOverview({ data, className }: { data: DashboardData | u
   const total = rows.reduce((t, r) => ({ skus: t.skus, quantity: t.quantity + r.quantity, value: t.value + r.value, lowStock: t.lowStock + r.lowStock }), { skus: 0, quantity: 0, value: 0, lowStock: 0 });
   return (
     <Card label="Warehouse overview" className={className}>
-      <CardHeader title="Warehouse Overview" subtitle="All warehouses · stock at cost" action={<ViewAllSoon module="Warehouses & Locations" />} />
+      <CardHeader title="Warehouse Overview" subtitle="All warehouses · stock at cost" action={<ViewAll href="/warehouses" />} />
       {!data ? (
         <RowsSkeleton rows={4} />
       ) : (

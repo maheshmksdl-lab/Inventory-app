@@ -3,10 +3,22 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { BellIcon, CaretDownIcon, InfoIcon, ListIcon, MagnifyingGlassIcon, SidebarSimpleIcon, XIcon } from "@phosphor-icons/react/dist/ssr";
+import {
+  BellIcon,
+  CaretDownIcon,
+  GearSixIcon,
+  InfoIcon,
+  ListIcon,
+  MagnifyingGlassIcon,
+  QuestionIcon,
+  SidebarSimpleIcon,
+  SignOutIcon,
+  UserCircleIcon,
+  UsersThreeIcon,
+  XIcon,
+} from "@phosphor-icons/react/dist/ssr";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ProductThumb } from "@/components/shared/product-thumb";
-import { SoonTag } from "@/components/shared/inventory-ui";
 import { WarehouseSelect } from "@/components/shared/warehouse-select";
 import { useDashboard, useItemSearch } from "@/hooks/use-inventory";
 import { useHydrated } from "@/hooks/use-hydrated";
@@ -216,16 +228,65 @@ function AccountMenu() {
           <span className="block text-[12px] font-normal text-ink-muted">Administrator · Demo workspace</span>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem disabled>
-          Profile <SoonTag />
+        <DropdownMenuItem asChild>
+          <Link href="/settings?tab=preferences">
+            <UserCircleIcon aria-hidden /> My preferences
+          </Link>
         </DropdownMenuItem>
-        <DropdownMenuItem disabled>
-          Settings &amp; Integrations <SoonTag />
+        <DropdownMenuItem asChild>
+          <Link href="/users">
+            <UsersThreeIcon aria-hidden /> Users &amp; Permissions
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href="/settings">
+            <GearSixIcon aria-hidden /> Settings &amp; Integrations
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          {/* No session exists in this prototype: this only opens the demo sign-in screen. */}
+          <Link href="/login">
+            <SignOutIcon aria-hidden /> Go to sign-in screen (demo)
+          </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <p className="flex gap-2 px-2 py-1.5 text-[12px] leading-4 text-ink-muted">
           <InfoIcon size={14} aria-hidden className="mt-px shrink-0" />
-          Frontend demo: data is sample data held in this browser tab and resets on reload.
+          Frontend demo: data is sample data held in this browser tab and resets on reload. There is no real sign-in.
+        </p>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+/** Help: shortcuts and what this prototype does and doesn't do. */
+function HelpMenu() {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger aria-label="Help" className={cn(toolClass, "hidden sm:inline-flex")}>
+        <QuestionIcon size={20} aria-hidden />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-72 rounded-xl">
+        <DropdownMenuLabel className="text-[14px] font-semibold text-ink">Help</DropdownMenuLabel>
+        <div className="space-y-1.5 px-2 pb-2 text-[12.5px] text-ink-body">
+          <p className="flex justify-between">
+            Search items <kbd className="rounded border border-line px-1.5 font-sans text-[11px] text-ink-muted">Ctrl K</kbd>
+          </p>
+          <p className="flex justify-between">
+            Focus search <kbd className="rounded border border-line px-1.5 font-sans text-[11px] text-ink-muted">/</kbd>
+          </p>
+        </div>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link href="/reports">Reports &amp; Analytics</Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href="/stock-movements">Stock Movement History</Link>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <p className="px-2 py-1.5 text-[12px] leading-4 text-ink-muted">
+          This is a frontend prototype. Orders, receipts, transfers and adjustments are saved as demo records only — stock balances never change and nothing is sent anywhere.
         </p>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -251,13 +312,14 @@ export function AppHeader() {
       <LogoMark className="size-8 sm:hidden" />
 
       {nav && (
-        <div className="hidden min-w-0 items-baseline gap-2 sm:flex">
-          <span className="truncate text-[15px] leading-6 font-semibold text-ink">{nav.item.label}</span>
-          <span className="hidden truncate text-[13px] text-ink-muted xl:inline">/ {nav.group.label}</span>
+        // The page title keeps its width; the search box takes what is left (up to 460px).
+        <div className="hidden min-w-0 shrink items-baseline gap-2 sm:flex">
+          <span className="max-w-[240px] truncate text-[15px] leading-6 font-semibold whitespace-nowrap text-ink">{nav.item.label}</span>
+          <span className="hidden shrink-0 text-[13px] whitespace-nowrap text-ink-muted 2xl:inline">/ {nav.group.label}</span>
         </div>
       )}
 
-      <SearchField className="mx-auto hidden w-full max-w-[460px] flex-1 md:block" />
+      <SearchField className="mx-auto hidden w-full max-w-[460px] min-w-[200px] flex-1 basis-0 md:block" />
       <div className="flex-1 md:hidden" />
 
       <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-2">
@@ -266,6 +328,7 @@ export function AppHeader() {
         </button>
         <WarehouseSelect className="hidden h-10 lg:flex" />
         <NotificationsMenu />
+        <HelpMenu />
         <AccountMenu />
       </div>
 

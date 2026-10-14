@@ -11,7 +11,7 @@ import { AppLogo } from "./app-logo";
 import { NAV_GROUPS, navFor, type NavItem } from "./nav-config";
 import { useShell } from "./shell-context";
 
-/** Wraps an item in a right-side tooltip (always for unavailable items, on the collapsed rail for the rest). */
+/** Wraps an item in a right-side tooltip on the collapsed rail. */
 function SideTip({ show, label, children }: { show: boolean; label: string; children: ReactElement }) {
   if (!show) return children;
   return (
@@ -29,32 +29,15 @@ function NavRow({ item, active, collapsed, onNavigate }: { item: NavItem; active
     collapsed ? "mx-auto size-9 justify-center" : "h-[34px] w-full gap-3 px-3",
     active
       ? cn("bg-brand-10 font-medium text-ink", !collapsed && "before:absolute before:inset-y-1.5 before:left-0 before:w-[3px] before:rounded-r-full before:bg-brand")
-      : item.available
-        ? "text-ink-body hover:bg-brand-depth-10 hover:text-ink"
-        : "cursor-default text-ink-muted",
+      : "text-ink-body hover:bg-brand-depth-10 hover:text-ink",
   );
   const body = (
     <>
-      <IconCmp
-        size={18}
-        weight={active ? "fill" : "regular"}
-        aria-hidden
-        className={cn("shrink-0", active ? "text-brand" : item.available ? "text-ink-muted group-hover:text-ink" : "text-ink-faint")}
-      />
+      <IconCmp size={18} weight={active ? "fill" : "regular"} aria-hidden className={cn("shrink-0", active ? "text-brand" : "text-ink-muted group-hover:text-ink")} />
       <span className={collapsed ? "sr-only" : "truncate"}>{item.label}</span>
     </>
   );
 
-  if (!item.available) {
-    return (
-      <SideTip show label={`${item.label} · coming soon`}>
-        <span aria-disabled="true" tabIndex={0} className={cls}>
-          {body}
-          <span className="sr-only"> — coming soon</span>
-        </span>
-      </SideTip>
-    );
-  }
   return (
     <SideTip show={collapsed} label={item.label}>
       <Link href={item.href} onClick={onNavigate} aria-current={active ? "page" : undefined} className={cls}>

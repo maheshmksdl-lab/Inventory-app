@@ -258,7 +258,7 @@ function SuppliersTab({ d }: { d: ItemDetail }) {
     <Card>
       <CardHeader title="Suppliers" subtitle="Vendors this item is bought from" />
       {list.length === 0 ? (
-        <EmptyState icon={StorefrontIcon} title="No suppliers linked" hint="Suppliers will be linked from the Vendors module, which is coming soon." />
+        <EmptyState icon={StorefrontIcon} title="No suppliers linked" hint="Vendors list the items they supply on their Products tab." />
       ) : (
         <div className="relative overflow-x-auto scrollbar-thin">
           <table className="w-full min-w-[560px] border-collapse">
