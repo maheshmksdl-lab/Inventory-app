@@ -185,7 +185,7 @@ export function ReceiptFormView({ poId: initialPo }: { poId?: string }) {
                       <tr key={r.productId} className="border-b border-line-soft align-top">
                         <td className={td}>
                           <span className="flex items-center gap-3">
-                            {p && <ProductThumb icon={p.icon} size={30} />}
+                            {p && <ProductThumb icon={p.icon} src={p.image} size={30} />}
                             <span className="min-w-0">
                               <TextLink href={itemHref(r.productId)} className="block truncate">
                                 {p?.name}

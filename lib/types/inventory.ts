@@ -11,11 +11,45 @@ export interface Warehouse {
   city: string;
 }
 
-export type ItemType = "stocked" | "consumable" | "bundle";
+/**
+ * Item kinds, as in Zoho Inventory: physical goods, services (sold or bought
+ * but never stocked) and composite items assembled from other items.
+ */
+export type ItemType = "goods" | "service" | "composite";
 export type Lifecycle = "active" | "inactive" | "archived";
 export type StockStatus = "in-stock" | "low-stock" | "out-of-stock";
-/** What a listing shows: stock state for active items, otherwise the lifecycle. */
-export type DisplayStatus = StockStatus | "inactive" | "archived";
+/** What a listing shows: stock state for active tracked items, otherwise the lifecycle. */
+export type DisplayStatus = StockStatus | "untracked" | "inactive" | "archived";
+
+export type ValuationMethod = "fifo" | "weighted-average";
+/** Advanced tracking: none, a serial number per unit, or batch / lot numbers. */
+export type TrackingMode = "none" | "serial" | "batch";
+export type DimensionUnit = "cm" | "in";
+export type WeightUnit = "kg" | "g" | "lb" | "oz";
+
+export interface ItemDimensions {
+  length: number;
+  width: number;
+  height: number;
+  unit: DimensionUnit;
+}
+
+export interface ItemWeight {
+  value: number;
+  unit: WeightUnit;
+}
+
+/** A variant attribute defined on a parent item, e.g. Colour: Black, Grey. */
+export interface ItemAttribute {
+  name: string;
+  options: string[];
+}
+
+/** One item (and how many of it) inside a composite item. */
+export interface CompositeComponent {
+  productId: string;
+  quantity: number;
+}
 
 export type ProductIconKey =
   | "headphones"
@@ -50,7 +84,7 @@ export interface ProductSupplier {
   preferred: boolean;
 }
 
-export type ActivityKind = "created" | "updated" | "price" | "archived" | "restored" | "status";
+export type ActivityKind = "created" | "updated" | "price" | "archived" | "restored" | "status" | "images" | "variant";
 
 export interface ProductActivity {
   id: string;
@@ -64,19 +98,58 @@ export interface Product {
   id: string;
   name: string;
   sku: string;
+  /** UPC / EAN barcode. */
   barcode: string;
+  /** Manufacturer part number. */
+  mpn: string;
+  isbn: string;
+  /** HSN code for goods, SAC code for services (GST). */
+  hsnCode: string;
+  /** Sales description: what customers see on sales documents. */
   description: string;
   category: string;
+  /** Optional, as in Zoho; "" when not set. */
   brand: string;
+  manufacturer: string;
   type: ItemType;
   unit: string;
-  costPrice: number;
+  returnable: boolean;
+  /** Packed size and weight, for shipping (goods and composite items). */
+  dimensions: ItemDimensions | null;
+  weight: ItemWeight | null;
+
+  sellable: boolean;
   sellingPrice: number;
+  salesAccount: string;
+  purchasable: boolean;
+  costPrice: number;
+  purchaseAccount: string;
+  purchaseDescription: string;
+  preferredVendorId: string;
   taxClass: string;
+
+  /** Services are never tracked. Fixed once the item is created. */
+  trackInventory: boolean;
+  inventoryAccount: string;
+  valuationMethod: ValuationMethod;
+  tracking: TrackingMode;
   /** Item-level reorder point, compared with total available stock. */
   reorderPoint: number;
+
   lifecycle: Lifecycle;
   icon: ProductIconKey;
+  /** Photos, primary first: /public paths or uploaded data URLs. Up to 15. */
+  images: string[];
+  /** The primary photo (images[0]); items without one show their category glyph. */
+  image?: string;
+  /** Composite items: what one unit is made of. Empty for other types. */
+  components: CompositeComponent[];
+  /** Variant attributes this item defines for its family (goods only). */
+  attributes: ItemAttribute[];
+  /** A variant points at the item it was added from; null for everything else. */
+  parentId: string | null;
+  /** This item's value for each family attribute, e.g. { Colour: "Grey" }. */
+  variantValues: Record<string, string>;
   stock: StockBalance[];
   suppliers: ProductSupplier[];
   activity: ProductActivity[];
@@ -125,6 +198,7 @@ export interface LowStockAlert {
   name: string;
   sku: string;
   icon: ProductIconKey;
+  image?: string;
   warehouseId: WarehouseId;
   available: number;
   reorderPoint: number;
@@ -151,6 +225,7 @@ export interface TopSeller {
   name: string;
   sku: string;
   icon: ProductIconKey;
+  image?: string;
   quantity: number;
   revenue: number;
 }
@@ -176,8 +251,8 @@ export interface DashboardData {
   purchaseOrders: Record<PurchaseOrderStatus, number>;
   salesOrders: Record<SalesOrderStatus, number>;
   recentMovements: StockMovement[];
-  /** Name and icon of each product in recentMovements. */
-  movementProducts: Record<string, { name: string; icon: ProductIconKey }>;
+  /** Name, icon and photo of each product in recentMovements. */
+  movementProducts: Record<string, { name: string; icon: ProductIconKey; image?: string }>;
   warehouses: WarehouseSummary[];
   topSellers: TopSeller[];
 }

@@ -67,7 +67,7 @@ export function ReorderAlertsView({ initialQuery = "" }: { initialQuery?: string
       sortValue: (a) => a.product.name,
       cell: (a) => (
         <span className="flex min-w-[200px] items-center gap-3">
-          <ProductThumb icon={a.product.icon} size={30} />
+          <ProductThumb icon={a.product.icon} src={a.product.image} size={30} />
           <span className="min-w-0">
             <TextLink href={itemHref(a.product.id)} className="block truncate">
               {a.product.name}

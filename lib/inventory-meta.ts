@@ -13,6 +13,8 @@ import type {
   SalesOrderStatus,
   StockBalance,
   StockStatus,
+  TrackingMode,
+  ValuationMethod,
   WarehouseScope,
 } from "@/lib/types/inventory";
 
@@ -29,6 +31,7 @@ export const STATUS_META: Record<DisplayStatus, Tone> = {
   "in-stock": tone("In Stock", "var(--success)", "var(--success-bg)"),
   "low-stock": tone("Low Stock", "var(--warning)", "var(--warning-bg)"),
   "out-of-stock": tone("Out of Stock", "var(--danger)", "var(--danger-bg)"),
+  untracked: tone("Not Tracked", "var(--info)", "var(--info-bg)"),
   inactive: tone("Inactive", "var(--neutral-fg)", "var(--neutral-bg)"),
   archived: tone("Archived", "var(--neutral-fg)", "var(--neutral-bg)"),
 };
@@ -41,9 +44,27 @@ export const MOVEMENT_META: Record<MovementType, Tone> = {
 };
 
 export const ITEM_TYPE_LABEL: Record<ItemType, string> = {
-  stocked: "Stocked item",
-  consumable: "Consumable",
-  bundle: "Bundle / kit",
+  goods: "Goods",
+  service: "Service",
+  composite: "Composite item",
+};
+
+/** What each item type is for, shown on the type picker. */
+export const ITEM_TYPE_HINT: Record<ItemType, string> = {
+  goods: "Physical products you buy, stock and sell.",
+  service: "Work you sell or buy. No stock is kept.",
+  composite: "A kit or bundle assembled from other items.",
+};
+
+export const VALUATION_LABEL: Record<ValuationMethod, string> = {
+  fifo: "FIFO (First In, First Out)",
+  "weighted-average": "Weighted Average Cost",
+};
+
+export const TRACKING_LABEL: Record<TrackingMode, string> = {
+  none: "None",
+  serial: "Serial numbers",
+  batch: "Batches",
 };
 
 export const LIFECYCLE_LABEL: Record<Lifecycle, string> = {
@@ -85,14 +106,18 @@ export function stockStatusOf(availableQty: number, reorderPoint: number): Stock
   return "in-stock";
 }
 
-/** A product's totals for a scope: one warehouse, or all of them against the item-level reorder point. */
+/**
+ * A product's totals for a scope: one warehouse, or all of them against the
+ * item-level reorder point. Untracked items (services) are never low or out of
+ * stock: their stock status stays "in-stock" and they display as Not Tracked.
+ */
 export function toRow(p: Product, scope: WarehouseScope): ProductRow {
   const balances = scope === "all" ? p.stock : p.stock.filter((b) => b.warehouseId === scope);
   const onHand = balances.reduce((s, b) => s + b.onHand, 0);
   const reserved = balances.reduce((s, b) => s + b.reserved, 0);
   const avail = onHand - reserved;
   const scopeReorderPoint = scope === "all" ? p.reorderPoint : (balances[0]?.reorderPoint ?? 0);
-  const stockStatus = stockStatusOf(avail, scopeReorderPoint);
-  const status: DisplayStatus = p.lifecycle === "active" ? stockStatus : p.lifecycle;
+  const stockStatus = p.trackInventory ? stockStatusOf(avail, scopeReorderPoint) : "in-stock";
+  const status: DisplayStatus = p.lifecycle !== "active" ? p.lifecycle : p.trackInventory ? stockStatus : "untracked";
   return { ...p, onHand, reserved, available: avail, scopeReorderPoint, stockValue: onHand * p.costPrice, stockStatus, status };
 }

@@ -4,10 +4,12 @@ import { HOME_ROUTE } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 
 /**
- * Brand assets. Replace the files in public/brand with the official EVOQ
- * Inventory logo (keep the paths, or update them here) — nothing else changes.
+ * Brand assets: the official EVOQ Inventory logo (same family as the Projects
+ * app's), and its mark redrawn as SVG so it stays sharp at small sizes.
  */
-export const LOGO_SRC = "/brand/evoq-inventory-logo.svg";
+export const LOGO_SRC = "/brand/evoq-inventory-logo.png";
+export const LOGO_WIDTH = 200;
+export const LOGO_HEIGHT = 55;
 export const MARK_SRC = "/brand/evoq-inventory-mark.svg";
 
 /** The square mark alone (collapsed sidebar, phone header). */
@@ -22,7 +24,7 @@ export function AppLogo({ className, compact }: { className?: string; compact?: 
       {compact ? (
         <LogoMark />
       ) : (
-        <Image src={LOGO_SRC} alt="EVOQ Inventory" width={176} height={48} priority className="h-10 w-auto shrink-0 select-none" draggable={false} unoptimized />
+        <Image src={LOGO_SRC} alt="EVOQ Inventory" width={LOGO_WIDTH} height={LOGO_HEIGHT} priority className="h-10 w-auto shrink-0 select-none" draggable={false} />
       )}
     </Link>
   );

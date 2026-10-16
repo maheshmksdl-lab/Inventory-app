@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 export interface MovementProduct {
   name: string;
   icon: ProductIconKey;
+  image?: string;
 }
 
 const whShort = (id: string | null) => warehouseById(id)?.short ?? "—";
@@ -120,7 +121,7 @@ export function CompactMovementTable({ rows, products, caption }: { rows: StockM
               <tr key={m.id} className="border-b border-line-soft last:border-0">
                 <td className={cn(td, "py-2.5")}>
                   <span className="flex min-w-0 items-center gap-2.5">
-                    {p && <ProductThumb icon={p.icon} size={30} />}
+                    {p && <ProductThumb icon={p.icon} src={p.image} size={30} />}
                     <span className="min-w-0">
                       {p ? (
                         <Link href={itemHref(m.productId)} className="block truncate rounded font-medium text-ink hover:text-brand focus-visible:outline-2 focus-visible:outline-brand-action">

@@ -1,16 +1,51 @@
 /**
  * DEMO DATA — sample catalogue for the frontend prototype. Brands are fictional.
  * Stock per warehouse is [onHand, reserved, reorderPoint]; reserved never exceeds
- * on hand, so available (onHand − reserved) is never negative.
+ * on hand, so available (onHand − reserved) is never negative. Each seed has a
+ * photo at public/products/<id>.jpg (credits in public/products/CREDITS.md).
  */
-import type { ItemType, Lifecycle, Product, ProductIconKey, ProductSupplier, WarehouseId } from "@/lib/types/inventory";
+import type { CompositeComponent, ItemAttribute, ItemType, Lifecycle, Product, ProductIconKey, ProductSupplier, TrackingMode, WarehouseId } from "@/lib/types/inventory";
 
-export const CATEGORIES = ["Audio", "Peripherals", "Displays", "Printers & Supplies", "Accessories", "Networking", "Furniture", "Storage", "Power"];
+export const CATEGORIES = ["Audio", "Peripherals", "Displays", "Printers & Supplies", "Accessories", "Networking", "Furniture", "Storage", "Power", "Services"];
+/** Subcategories, one level under a top-level category: [name, parent]. */
+export const SUBCATEGORIES: [name: string, parent: string][] = [["Installation", "Services"]];
 export const BRANDS = ["Sonora", "Keyforge", "Vistaview", "Printwell", "Linkpoint", "Ergoseat", "Voltix", "Datavault", "Lumio"];
-export const UNITS = ["pcs", "box", "set", "pack"];
+export const UNITS = ["pcs", "box", "set", "pack", "hrs"];
 export const TAX_CLASSES = ["GST 5%", "GST 12%", "GST 18%", "GST 28%", "Exempt"];
 
+/** Chart-of-accounts names offered on the item form (Zoho's defaults). */
+export const SALES_ACCOUNTS = ["Sales", "General Income", "Other Charges", "Shipping Charge", "Discount"];
+export const PURCHASE_ACCOUNTS = ["Cost of Goods Sold", "Purchases", "Job Costing", "Materials", "Subcontractor", "Freight Inward"];
+export const INVENTORY_ACCOUNTS = ["Inventory Asset", "Finished Goods", "Raw Materials", "Work in Progress"];
+
+const MANUFACTURER: Record<string, string> = {
+  Sonora: "Sonora Audio Pvt. Ltd.",
+  Keyforge: "Keyforge Peripherals Co.",
+  Vistaview: "Vistaview Displays Ltd.",
+  Printwell: "Printwell Imaging Ltd.",
+  Linkpoint: "Linkpoint Networks Pvt. Ltd.",
+  Ergoseat: "Ergoseat Furniture LLP",
+  Voltix: "Voltix Power Systems",
+  Datavault: "Datavault Technologies",
+  Lumio: "Lumio Lighting Pvt. Ltd.",
+};
+
+/** Indicative GST HSN codes by category (SAC for services). */
+const HSN: Record<string, string> = {
+  Audio: "8518",
+  Peripherals: "8471",
+  Displays: "8528",
+  "Printers & Supplies": "8443",
+  Accessories: "8473",
+  Networking: "8517",
+  Furniture: "9403",
+  Storage: "8523",
+  Power: "8507",
+  Installation: "998732",
+};
+
 type Stock = [onHand: number, reserved: number, reorderPoint: number];
+const NO_STOCK: [Stock, Stock, Stock] = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
 
 interface Seed {
   id: string;
@@ -30,7 +65,47 @@ interface Seed {
   description: string;
   created: string;
   updated: string;
+  /** Photo file under /public/products when it isn't <id>.jpg; null for none. */
+  photo?: string | null;
+  tracking?: TrackingMode;
+  returnable?: boolean;
+  components?: CompositeComponent[];
+  attributes?: ItemAttribute[];
+  parentId?: string;
+  values?: Record<string, string>;
 }
+
+/** Packed size in cm and weight in kg: [length, width, height, kg]. */
+const SHIPPING: Record<string, [number, number, number, number]> = {
+  "wireless-headphones": [22, 19, 9, 0.45],
+  "mechanical-keyboard": [46, 16, 5, 1.2],
+  "gaming-mouse": [17, 11, 6, 0.25],
+  "led-monitor-24": [62, 42, 14, 4.8],
+  "inkjet-printer": [48, 40, 25, 6.5],
+  "usb-c-hub": [14, 8, 3, 0.12],
+  "office-chair": [70, 62, 40, 16],
+  "office-chair-grey": [70, 62, 40, 16],
+  "network-switch": [48, 30, 8, 3.4],
+  "wireless-mouse": [15, 10, 5, 0.15],
+  "portable-ssd-1tb": [13, 9, 3, 0.1],
+  "hd-webcam": [16, 10, 8, 0.25],
+  "bluetooth-speaker": [20, 12, 10, 0.7],
+  "laptop-stand": [30, 25, 5, 1.1],
+  "led-desk-lamp": [45, 18, 12, 1.4],
+  "monitor-27-4k": [72, 50, 16, 7.9],
+  "laser-printer": [45, 42, 32, 9.6],
+  "toner-cartridge": [38, 14, 14, 1.3],
+  "power-bank": [17, 10, 4, 0.48],
+  "surge-protector": [35, 12, 6, 0.6],
+  "standing-desk": [150, 75, 20, 38],
+  "hdmi-cable": [22, 18, 6, 0.55],
+  "wifi-router": [32, 22, 9, 1.1],
+  "keyboard-mouse-combo": [48, 18, 6, 1.0],
+  "usb-headset": [22, 18, 8, 0.35],
+  "laptop-14": [42, 30, 7, 2.3],
+  "wired-keyboard": [46, 16, 4, 0.7],
+  "wireless-keyboard": [44, 15, 4, 0.6],
+};
 
 const SEEDS: Seed[] = [
   { id: "wireless-headphones", name: "Wireless Headphones", sku: "WH-1000XM5", category: "Audio", brand: "Sonora", cost: 18500, price: 24990, icon: "headphones", stock: [[4, 0, 20], [18, 3, 10], [6, 1, 6]], vendors: [["vn-meridian", true], ["vn-apex"]], description: "Over-ear wireless headphones with active noise cancellation, 30-hour battery and a carry case.", created: "2025-11-04T10:12:00", updated: "2026-10-09T15:40:00" },
@@ -39,7 +114,7 @@ const SEEDS: Seed[] = [
   { id: "led-monitor-24", name: "24\" LED Monitor", sku: "LM-24FHD", category: "Displays", brand: "Vistaview", cost: 9800, price: 13499, icon: "monitor", stock: [[3, 0, 12], [5, 1, 6], [0, 0, 4]], vendors: [["vn-meridian", true]], description: "24-inch Full HD IPS monitor with HDMI and DisplayPort inputs and a tilt-adjustable stand.", created: "2025-11-10T14:00:00", updated: "2026-10-11T09:25:00" },
   { id: "inkjet-printer", name: "Inkjet Printer", sku: "IP-2770", category: "Printers & Supplies", brand: "Printwell", cost: 7400, price: 9999, icon: "printer", stock: [[1, 0, 8], [0, 0, 4], [0, 0, 2]], vendors: [["vn-orbit", true]], description: "All-in-one colour inkjet printer with Wi-Fi, scanning and duplex printing.", created: "2025-11-12T11:45:00", updated: "2026-10-12T16:00:00" },
   { id: "usb-c-hub", name: "USB-C Hub", sku: "UH-7P", category: "Accessories", brand: "Linkpoint", cost: 1650, price: 2499, icon: "usb", stock: [[120, 15, 30], [64, 8, 20], [30, 0, 10]], vendors: [["vn-crestline", true], ["vn-apex"]], description: "7-in-1 USB-C hub with HDMI 4K, three USB-A ports, SD card reader and 100 W pass-through.", created: "2025-11-15T10:00:00", updated: "2026-09-30T12:30:00" },
-  { id: "office-chair", name: "Office Chair", sku: "OC-ERG", category: "Furniture", brand: "Ergoseat", unit: "pcs", cost: 11200, price: 16499, icon: "chair", stock: [[14, 2, 8], [6, 0, 4], [0, 0, 2]], vendors: [["vn-orbit", true]], description: "Ergonomic mesh office chair with adjustable lumbar support and 4D armrests.", created: "2025-12-01T09:00:00", updated: "2026-09-18T10:15:00" },
+  { id: "office-chair", name: "Office Chair", sku: "OC-ERG", category: "Furniture", brand: "Ergoseat", unit: "pcs", cost: 11200, price: 16499, icon: "chair", stock: [[14, 2, 8], [6, 0, 4], [0, 0, 2]], vendors: [["vn-orbit", true]], description: "Ergonomic mesh office chair with adjustable lumbar support and 4D armrests.", created: "2025-12-01T09:00:00", updated: "2026-09-18T10:15:00", attributes: [{ name: "Colour", options: ["Black", "Grey"] }], values: { Colour: "Black" } },
   { id: "network-switch", name: "Network Switch", sku: "NS-24G", category: "Networking", brand: "Linkpoint", cost: 14800, price: 19999, icon: "network", stock: [[0, 0, 4], [0, 0, 2], [0, 0, 2]], vendors: [["vn-meridian", true]], description: "24-port gigabit managed switch, rack-mountable, with VLAN and QoS support.", created: "2025-12-03T13:20:00", updated: "2026-10-07T14:45:00" },
   { id: "wireless-mouse", name: "Wireless Mouse", sku: "WM-310", category: "Peripherals", brand: "Keyforge", cost: 950, price: 1499, icon: "mouse", stock: [[85, 10, 25], [40, 6, 15], [22, 0, 10]], vendors: [["vn-apex", true]], description: "Compact wireless mouse with silent clicks and a 12-month battery life.", created: "2025-12-05T10:30:00", updated: "2026-09-21T09:50:00" },
   { id: "portable-ssd-1tb", name: "Portable SSD 1TB", sku: "PS-1TB", category: "Storage", brand: "Datavault", cost: 6900, price: 9299, icon: "storage", stock: [[26, 4, 10], [12, 2, 6], [5, 0, 4]], vendors: [["vn-meridian", true], ["vn-crestline"]], description: "1 TB USB-C portable SSD with read speeds up to 1,050 MB/s.", created: "2026-01-08T11:00:00", updated: "2026-10-05T13:35:00" },
@@ -48,17 +123,21 @@ const SEEDS: Seed[] = [
   { id: "laptop-stand", name: "Laptop Stand", sku: "LS-ALU", category: "Accessories", brand: "Ergoseat", cost: 1200, price: 1899, icon: "laptop", stock: [[48, 5, 15], [20, 2, 8], [11, 0, 5]], vendors: [["vn-orbit", true]], description: "Adjustable aluminium laptop stand for 10–17 inch laptops.", created: "2026-02-02T10:00:00", updated: "2026-08-30T10:10:00" },
   { id: "led-desk-lamp", name: "LED Desk Lamp", sku: "DL-LED", category: "Furniture", brand: "Lumio", cost: 1450, price: 2199, icon: "lamp", stock: [[7, 1, 10], [10, 0, 6], [4, 0, 3]], vendors: [["vn-orbit", true]], description: "Dimmable LED desk lamp with adjustable colour temperature and USB charging port.", created: "2026-02-06T09:40:00", updated: "2026-10-10T12:00:00" },
   { id: "monitor-27-4k", name: "27\" 4K Monitor", sku: "LM-27UHD", category: "Displays", brand: "Vistaview", cost: 24500, price: 31999, icon: "monitor", stock: [[11, 3, 6], [4, 1, 3], [2, 0, 2]], vendors: [["vn-meridian", true]], description: "27-inch 4K UHD IPS monitor with USB-C power delivery and height-adjustable stand.", created: "2026-02-15T14:25:00", updated: "2026-10-01T15:15:00" },
-  { id: "laser-printer", name: "Laser Printer", sku: "LP-M404", category: "Printers & Supplies", brand: "Printwell", cost: 16800, price: 21999, icon: "printer", stock: [[5, 1, 3], [2, 0, 2], [1, 0, 1]], vendors: [["vn-orbit", true]], description: "Monochrome laser printer, 38 pages per minute, with Ethernet and duplex printing.", created: "2026-02-20T11:30:00", updated: "2026-09-15T09:30:00" },
-  { id: "toner-cartridge", name: "Toner Cartridge", sku: "TC-404X", category: "Printers & Supplies", brand: "Printwell", type: "consumable", cost: 3800, price: 5299, icon: "box", stock: [[24, 4, 12], [9, 1, 6], [2, 0, 4]], vendors: [["vn-orbit", true], ["vn-crestline"]], description: "High-yield black toner cartridge for the LP-M404 laser printer (approx. 10,000 pages).", created: "2026-02-20T11:45:00", updated: "2026-10-08T10:50:00" },
+  { id: "laser-printer", name: "Laser Printer", sku: "LP-M404", category: "Printers & Supplies", brand: "Printwell", cost: 16800, price: 21999, icon: "printer", stock: [[5, 1, 3], [2, 0, 2], [1, 0, 1]], vendors: [["vn-orbit", true]], description: "Monochrome laser printer, 38 pages per minute, with Ethernet and duplex printing.", created: "2026-02-20T11:30:00", updated: "2026-09-15T09:30:00", tracking: "serial" },
+  { id: "toner-cartridge", name: "Toner Cartridge", sku: "TC-404X", category: "Printers & Supplies", brand: "Printwell", tracking: "batch", returnable: false, cost: 3800, price: 5299, icon: "box", stock: [[24, 4, 12], [9, 1, 6], [2, 0, 4]], vendors: [["vn-orbit", true], ["vn-crestline"]], description: "High-yield black toner cartridge for the LP-M404 laser printer (approx. 10,000 pages).", created: "2026-02-20T11:45:00", updated: "2026-10-08T10:50:00" },
   { id: "power-bank", name: "Power Bank 20000mAh", sku: "PB-20K", category: "Power", brand: "Voltix", cost: 1800, price: 2799, icon: "power", stock: [[60, 6, 20], [28, 3, 10], [15, 0, 6]], vendors: [["vn-crestline", true]], description: "20,000 mAh power bank with 65 W USB-C PD output.", created: "2026-03-03T10:05:00", updated: "2026-09-20T14:05:00" },
   { id: "surge-protector", name: "Surge Protector", sku: "SP-6W", category: "Power", brand: "Voltix", cost: 900, price: 1399, icon: "power", stock: [[70, 0, 20], [35, 2, 10], [18, 0, 6]], vendors: [["vn-crestline", true]], description: "6-socket surge protector with 2 USB ports and a 2-metre cable.", created: "2026-03-05T12:15:00", updated: "2026-08-26T11:45:00" },
   { id: "standing-desk", name: "Standing Desk", sku: "SD-140", category: "Furniture", brand: "Ergoseat", cost: 21500, price: 28999, icon: "desk", stock: [[4, 1, 3], [2, 0, 2], [0, 0, 1]], vendors: [["vn-orbit", true]], description: "Electric height-adjustable standing desk, 140 × 70 cm top, dual motor.", created: "2026-03-18T09:20:00", updated: "2026-09-29T16:20:00" },
-  { id: "hdmi-cable", name: "HDMI Cable 2m", sku: "HC-2M", category: "Accessories", brand: "Linkpoint", type: "consumable", unit: "pack", cost: 1100, price: 1699, icon: "box", stock: [[90, 10, 30], [45, 5, 15], [20, 0, 8]], vendors: [["vn-crestline", true]], description: "Pack of five 2-metre high-speed HDMI 2.1 cables.", created: "2026-04-01T10:00:00", updated: "2026-09-10T10:00:00" },
+  { id: "hdmi-cable", name: "HDMI Cable 2m", sku: "HC-2M", category: "Accessories", brand: "Linkpoint", unit: "pack", cost: 1100, price: 1699, icon: "box", stock: [[90, 10, 30], [45, 5, 15], [20, 0, 8]], vendors: [["vn-crestline", true]], description: "Pack of five 2-metre high-speed HDMI 2.1 cables.", created: "2026-04-01T10:00:00", updated: "2026-09-10T10:00:00" },
   { id: "wifi-router", name: "Wi-Fi 6 Router", sku: "WR-AX3000", category: "Networking", brand: "Linkpoint", cost: 5600, price: 7999, icon: "network", stock: [[9, 2, 6], [3, 0, 4], [2, 0, 2]], vendors: [["vn-meridian", true]], description: "Dual-band Wi-Fi 6 router, AX3000, with four gigabit LAN ports.", created: "2026-04-12T15:30:00", updated: "2026-10-06T13:00:00" },
-  { id: "keyboard-mouse-combo", name: "Keyboard & Mouse Combo", sku: "KM-COMBO", category: "Peripherals", brand: "Keyforge", type: "bundle", unit: "set", cost: 2100, price: 2999, icon: "keyboard", stock: [[25, 3, 10], [12, 0, 6], [6, 0, 3]], vendors: [["vn-apex", true]], description: "Bundle of a wireless keyboard and the WM-310 wireless mouse with a shared receiver.", created: "2026-05-02T10:10:00", updated: "2026-09-05T15:30:00" },
+  { id: "keyboard-mouse-combo", name: "Keyboard & Mouse Combo", sku: "KM-COMBO", category: "Peripherals", brand: "Keyforge", type: "composite", unit: "set", cost: 2100, price: 2999, icon: "keyboard", stock: [[25, 3, 10], [12, 0, 6], [6, 0, 3]], vendors: [["vn-apex", true]], components: [{ productId: "wireless-keyboard", quantity: 1 }, { productId: "wireless-mouse", quantity: 1 }], description: "Bundle of the WK-210 wireless keyboard and the WM-310 wireless mouse with a shared receiver.", created: "2026-05-02T10:10:00", updated: "2026-09-05T15:30:00" },
   { id: "usb-headset", name: "USB Headset with Mic", sku: "HS-USB", category: "Audio", brand: "Sonora", cost: 1900, price: 2799, icon: "headphones", stock: [[16, 2, 8], [0, 0, 4], [5, 0, 2]], vendors: [["vn-meridian", true]], description: "On-ear USB headset with noise-cancelling boom microphone and inline controls.", created: "2026-05-20T11:50:00", updated: "2026-10-13T10:30:00" },
-  { id: "laptop-14", name: "Business Laptop 14\"", sku: "BL-14I5", category: "Accessories", brand: "Datavault", cost: 52000, price: 64999, icon: "laptop", stock: [[2, 0, 2], [0, 0, 1], [0, 0, 1]], vendors: [["vn-meridian", true]], lifecycle: "inactive", description: "14-inch business laptop. Inactive: no longer reordered while the replacement model is evaluated.", created: "2026-06-01T09:00:00", updated: "2026-09-02T12:40:00" },
+  { id: "laptop-14", name: "Business Laptop 14\"", sku: "BL-14I5", category: "Accessories", brand: "Datavault", cost: 52000, price: 64999, icon: "laptop", stock: [[2, 0, 2], [0, 0, 1], [0, 0, 1]], vendors: [["vn-meridian", true]], lifecycle: "inactive", tracking: "serial", description: "14-inch business laptop. Inactive: no longer reordered while the replacement model is evaluated.", created: "2026-06-01T09:00:00", updated: "2026-09-02T12:40:00" },
   { id: "wired-keyboard", name: "Wired Keyboard", sku: "KB-120", category: "Peripherals", brand: "Keyforge", cost: 650, price: 999, icon: "keyboard", stock: [[0, 0, 0], [0, 0, 0], [0, 0, 0]], vendors: [["vn-apex", true]], lifecycle: "archived", description: "Basic wired membrane keyboard. Archived after being replaced by the combo set.", created: "2025-11-04T10:25:00", updated: "2026-07-15T09:10:00" },
+  // Added after the original catalogue (kept last so earlier barcodes don't change).
+  { id: "wireless-keyboard", name: "Wireless Keyboard", sku: "WK-210", category: "Peripherals", brand: "Keyforge", cost: 1100, price: 1699, icon: "keyboard", stock: [[30, 4, 10], [14, 0, 6], [6, 0, 3]], vendors: [["vn-apex", true]], photo: null, description: "Compact 2.4 GHz wireless keyboard with a numeric keypad and low-profile keys. Sold alone or in the KM-COMBO set.", created: "2026-05-02T09:40:00", updated: "2026-09-05T15:20:00" },
+  { id: "office-chair-grey", name: "Office Chair - Grey", sku: "OC-ERG-GRY", category: "Furniture", brand: "Ergoseat", cost: 11200, price: 16499, icon: "chair", stock: [[5, 1, 3], [3, 0, 2], [0, 0, 1]], vendors: [["vn-orbit", true]], photo: "office-chair.jpg", parentId: "office-chair", values: { Colour: "Grey" }, description: "Ergonomic mesh office chair with adjustable lumbar support and 4D armrests. Grey mesh and frame.", created: "2026-06-12T10:00:00", updated: "2026-09-18T10:20:00" },
+  { id: "setup-service", name: "On-site Setup & Installation", sku: "SRV-SETUP", category: "Installation", brand: "", type: "service", unit: "hrs", cost: 0, price: 1500, icon: "box", stock: NO_STOCK, vendors: [], photo: null, description: "Technician visit to unpack, assemble and configure equipment at the customer's site. Billed per hour.", created: "2026-04-20T09:00:00", updated: "2026-08-14T11:30:00" },
 ];
 
 const WH: WarehouseId[] = ["wh-main", "wh-branch", "wh-remote"];
@@ -86,22 +165,49 @@ export function seedProducts(): Product[] {
     if (s.updated > s.created) activity.push({ id: `${s.id}-a2`, kind: "updated", text: "Item details updated", user: i % 2 ? "Sarah M." : "Priya K.", at: s.updated });
     if (s.lifecycle === "inactive") activity.push({ id: `${s.id}-a3`, kind: "status", text: "Status changed to Inactive", user: "Admin User", at: s.updated });
     if (s.lifecycle === "archived") activity.push({ id: `${s.id}-a3`, kind: "archived", text: "Item archived", user: "Admin User", at: s.updated });
+    const type = s.type ?? "goods";
+    const service = type === "service";
+    const ship = SHIPPING[s.id];
+    const images = s.photo === null ? [] : [`/products/${s.photo ?? `${s.id}.jpg`}`];
     return {
       id: s.id,
       name: s.name,
       sku: s.sku,
-      barcode: barcodeFor(i),
+      barcode: service ? "" : barcodeFor(i),
+      mpn: service ? "" : `${s.brand.slice(0, 3).toUpperCase()}${s.sku.replace(/[^A-Z0-9]/gi, "")}`,
+      isbn: "",
+      hsnCode: HSN[s.category] ?? "",
       description: s.description,
       category: s.category,
       brand: s.brand,
-      type: s.type ?? "stocked",
+      manufacturer: MANUFACTURER[s.brand] ?? "",
+      type,
       unit: s.unit ?? "pcs",
-      costPrice: s.cost,
+      returnable: !service && (s.returnable ?? true),
+      dimensions: ship ? { length: ship[0], width: ship[1], height: ship[2], unit: "cm" } : null,
+      weight: ship ? { value: ship[3], unit: "kg" } : null,
+      sellable: true,
       sellingPrice: s.price,
+      salesAccount: "Sales",
+      purchasable: s.vendors.length > 0,
+      costPrice: s.cost,
+      purchaseAccount: "Cost of Goods Sold",
+      purchaseDescription: s.vendors.length ? `${s.name} — ${s.sku}` : "",
+      preferredVendorId: s.vendors.find(([, preferred]) => preferred)?.[0] ?? "",
       taxClass: s.tax ?? "GST 18%",
+      trackInventory: !service,
+      inventoryAccount: service ? "" : "Inventory Asset",
+      valuationMethod: "fifo",
+      tracking: s.tracking ?? "none",
       reorderPoint: stock.reduce((sum, b) => sum + b.reorderPoint, 0),
       lifecycle: s.lifecycle ?? "active",
       icon: s.icon,
+      images,
+      image: images[0],
+      components: s.components ?? [],
+      attributes: s.attributes ?? [],
+      parentId: s.parentId ?? null,
+      variantValues: s.values ?? {},
       stock,
       suppliers,
       activity: activity.reverse(),

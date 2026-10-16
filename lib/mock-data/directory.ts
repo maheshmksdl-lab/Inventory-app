@@ -4,7 +4,7 @@
  * GSTINs are fictional. Ids match products.ts and warehouses.ts.
  */
 import type { AppSettings, AppUser, CatalogEntry, CustomerRecord, VendorRecord, WarehouseRecord } from "@/lib/types/operations";
-import { BRANDS, CATEGORIES } from "./products";
+import { BRANDS, CATEGORIES, SUBCATEGORIES } from "./products";
 import { VENDORS, WAREHOUSES } from "./warehouses";
 
 const CATEGORY_NOTES: Record<string, string> = {
@@ -17,6 +17,7 @@ const CATEGORY_NOTES: Record<string, string> = {
   Furniture: "Chairs, desks and workspace lighting.",
   Storage: "External drives and storage media.",
   Power: "Power banks, surge protectors and chargers.",
+  Services: "Labour and support you sell or buy. Not stocked.",
 };
 
 const BRAND_NOTES: Record<string, string> = {
@@ -34,6 +35,14 @@ const BRAND_NOTES: Record<string, string> = {
 export function seedCategories(): CatalogEntry[] {
   return [
     ...CATEGORIES.map((name, i) => ({ id: `cat-${i + 1}`, name, description: CATEGORY_NOTES[name] ?? "", status: "active" as const, createdAt: "2025-11-01T09:00:00" })),
+    ...SUBCATEGORIES.map(([name, parent], i) => ({
+      id: `cat-sub-${i + 1}`,
+      name,
+      description: name === "Installation" ? "Setup, assembly and installation visits." : "",
+      parentId: `cat-${CATEGORIES.indexOf(parent) + 1}`,
+      status: "active" as const,
+      createdAt: "2026-04-20T09:00:00",
+    })),
     { id: "cat-legacy", name: "Cables (legacy)", description: "Retired grouping — cables now sit under Accessories.", status: "archived", createdAt: "2025-11-01T09:00:00" },
   ];
 }
@@ -182,7 +191,7 @@ export function seedSettings(): AppSettings {
     costingMethod: "weighted-average",
     allowNegativeStock: false,
     reorderSuggestion: "double-reorder-point",
-    units: ["pcs", "box", "set", "pack"],
+    units: ["pcs", "box", "set", "pack", "hrs"],
     numbering: { po: "PO-", so: "SO-", grn: "GRN-", trf: "TRF-", adj: "ADJ-", bill: "BILL-", rma: "RMA-", stk: "STK-" },
     skuPattern: "{CATEGORY}-{SEQ}",
     currency: "INR",

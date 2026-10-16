@@ -34,7 +34,7 @@ export function seedMovements(products: Product[]): StockMovement[] {
     const r = rand();
     return r < WH_WEIGHT[0] ? WH[0] : r < WH_WEIGHT[0] + WH_WEIGHT[1] ? WH[1] : WH[2];
   };
-  const tracked = products.filter((p) => p.lifecycle === "active");
+  const tracked = products.filter((p) => p.lifecycle === "active" && p.trackInventory);
   const seq = { grn: 1000, so: 2000, trf: 1000, adj: 500 };
   const out: StockMovement[] = [];
 

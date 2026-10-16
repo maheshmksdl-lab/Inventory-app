@@ -54,7 +54,7 @@ function Nav({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: () =>
     <nav aria-label="Main navigation" className={cn("flex-1 overflow-x-hidden overflow-y-auto pb-3 scrollbar-thin", collapsed ? "px-2" : "px-3")}>
       {NAV_GROUPS.map((group, i) => (
         <div key={group.label} className={cn(i > 0 && (collapsed ? "mt-2 border-t border-line-soft pt-2" : "mt-4"))}>
-          {!collapsed && <h2 className="mb-1 px-3 text-nav-group-label text-ink-muted uppercase">{group.label}</h2>}
+          {!collapsed && <h2 className="mb-1 px-3 text-nav-group-label text-primary uppercase">{group.label}</h2>}
           <ul className="space-y-0.5" aria-label={collapsed ? group.label : undefined}>
             {group.items.map((item) => (
               <li key={item.href}>

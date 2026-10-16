@@ -5,6 +5,9 @@ export const NEW_ITEM_ROUTE = "/items/new";
 
 export const itemHref = (id: string) => `/items/${encodeURIComponent(id)}`;
 export const itemEditHref = (id: string) => `/items/${encodeURIComponent(id)}/edit`;
+export const itemVariantNewHref = (id: string) => `/items/${encodeURIComponent(id)}/variants/new`;
+/** New item form, optionally pre-filled as a copy of another item. */
+export const itemCloneHref = (id: string) => `${NEW_ITEM_ROUTE}?clone=${encodeURIComponent(id)}`;
 
 // The Items list state (search, filters, page…) last shown, so "Back to Items" returns to it.
 let itemsListHref = ITEMS_ROUTE;

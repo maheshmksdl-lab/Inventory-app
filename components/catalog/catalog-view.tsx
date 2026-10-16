@@ -2,20 +2,21 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ArchiveIcon, ArrowCounterClockwiseIcon, PencilSimpleIcon, PlusIcon, TagIcon } from "@phosphor-icons/react/dist/ssr";
+import { ArchiveIcon, ArrowCounterClockwiseIcon, PencilSimpleIcon, PlusIcon, TagIcon, TrashIcon } from "@phosphor-icons/react/dist/ssr";
 import { toast } from "sonner";
 import { z } from "zod";
 import { DataTable, ListToolbar, matches, type Column } from "@/components/shared/data-table";
 import { StatRow, StatTile } from "@/components/shared/doc-ui";
-import { FormDialog, SESSION_NOTE, TextAreaField, TextField, useZodForm } from "@/components/shared/form-kit";
+import { ChoiceField, FormDialog, SESSION_NOTE, TextAreaField, TextField, useZodForm } from "@/components/shared/form-kit";
 import { Card, ConfirmDialog, FilterSelect, OutlineButton, PageHeading, PageShell, PrimaryButton, SearchInput, ToneBadge, UnderlineTabs } from "@/components/shared/inventory-ui";
 import { RowMenu } from "@/components/shared/row-menu";
 import { EmptyState } from "@/components/shared/state-panels";
-import { useProducts, useRecords, useSaveRecord } from "@/hooks/use-operations";
+import { useDeleteCatalogEntry, useProducts, useRecords, useSaveRecord } from "@/hooks/use-operations";
 import { formatDate, formatNumber } from "@/lib/format";
 import { RECORD_STATUS } from "@/lib/operations-meta";
 import { ITEMS_ROUTE } from "@/lib/routes";
 import type { CatalogEntry } from "@/lib/types/operations";
+import { cn } from "@/lib/utils";
 
 type Kind = "categories" | "brands";
 const NOUN: Record<Kind, { one: string; many: string; field: "category" | "brand" }> = {
@@ -26,13 +27,21 @@ const NOUN: Record<Kind, { one: string; many: string; field: "category" | "brand
 const schema = z.object({
   name: z.string().trim().min(2, "Enter a name (at least 2 characters)").max(60, "Keep the name under 60 characters"),
   description: z.string().trim().max(240, "Keep the description under 240 characters"),
+  parentId: z.string(),
 });
-type Values = { name: string; description: string };
+type Values = { name: string; description: string; parentId: string };
 
-function EntryDialog({ kind, entry, onClose }: { kind: Kind; entry: CatalogEntry | null; onClose: () => void }) {
+const NO_PARENT = "__none";
+
+/** Create or edit a category or brand. Also opened from the item form's "+" buttons. */
+export function CatalogEntryDialog({ kind, entry, onClose, onSaved }: { kind: Kind; entry: CatalogEntry | null; onClose: () => void; onSaved?: (name: string) => void }) {
   const save = useSaveRecord(kind);
+  const { data: categories } = useRecords("categories");
   const noun = NOUN[kind].one;
-  const form = useZodForm<Values>(schema, { name: entry?.name ?? "", description: entry?.description ?? "" }, `${kind}-form`);
+  const form = useZodForm<Values>(schema, { name: entry?.name ?? "", description: entry?.description ?? "", parentId: entry?.parentId ?? NO_PARENT }, `${kind}-form`);
+  // One level of nesting: parents are active top-level categories other than this one.
+  const hasChildren = !!entry && !!categories?.some((c) => c.parentId === entry.id);
+  const parents = (categories ?? []).filter((c) => !c.parentId && c.status === "active" && c.id !== entry?.id);
   return (
     <FormDialog
       open
@@ -42,23 +51,48 @@ function EntryDialog({ kind, entry, onClose }: { kind: Kind; entry: CatalogEntry
       submitLabel={entry ? "Save changes" : `Create ${noun}`}
       saving={form.saving}
       onSubmit={form.handleSubmit(async (v) => {
-        const saved = await save.mutateAsync({ id: entry?.id ?? "", name: v.name.trim(), description: v.description.trim(), status: entry?.status ?? "active", createdAt: entry?.createdAt ?? new Date().toISOString().slice(0, 19) });
+        const parentId = kind === "categories" && v.parentId !== NO_PARENT ? v.parentId : undefined;
+        const saved = await save.mutateAsync({ id: entry?.id ?? "", name: v.name.trim(), description: v.description.trim(), parentId, status: entry?.status ?? "active", createdAt: entry?.createdAt ?? new Date().toISOString().slice(0, 19) });
         toast.success(entry ? "Changes saved" : `${noun[0].toUpperCase()}${noun.slice(1)} created`, { description: `${saved.name} · ${SESSION_NOTE}` });
+        onSaved?.(saved.name);
         onClose();
       })}
     >
       <TextField form={form} name="name" label="Name" required className="sm:col-span-2" autoComplete="off" maxLength={60} placeholder={kind === "categories" ? "e.g. Cables" : "e.g. Northwind"} />
+      {kind === "categories" && (
+        <ChoiceField
+          form={form}
+          name="parentId"
+          label="Parent category"
+          className="sm:col-span-2"
+          hint={hasChildren ? "This category has subcategories, so it stays top-level." : "Optional. Filtering Items by the parent also shows its subcategories."}
+          options={[{ value: NO_PARENT, label: "None (top-level category)" }, ...(hasChildren ? [] : parents.map((c) => ({ value: c.id, label: c.name })))]}
+        />
+      )}
       <TextAreaField form={form} name="description" label="Description" className="sm:col-span-2" maxLength={240} hint={`${form.values.description.length}/240`} />
     </FormDialog>
   );
 }
 
-function CatalogTable({ kind, onEdit, onArchive, onRestore }: { kind: Kind; onEdit: (e: CatalogEntry) => void; onArchive: (e: CatalogEntry) => void; onRestore: (e: CatalogEntry) => void }) {
+function CatalogTable({
+  kind,
+  onEdit,
+  onArchive,
+  onRestore,
+  onDelete,
+}: {
+  kind: Kind;
+  onEdit: (e: CatalogEntry) => void;
+  onArchive: (e: CatalogEntry) => void;
+  onRestore: (e: CatalogEntry) => void;
+  onDelete: (e: CatalogEntry) => void;
+}) {
   const { data } = useRecords(kind);
   const { data: products } = useProducts();
   const [q, setQ] = useState("");
   const [status, setStatus] = useState("active");
   const field = NOUN[kind].field;
+  const parentOf = (e: CatalogEntry) => (e.parentId ? data?.find((c) => c.id === e.parentId) : undefined);
   const counts = useMemo(() => {
     const m = new Map<string, number>();
     for (const p of products ?? []) if (p.lifecycle !== "archived") m.set(p[field], (m.get(p[field]) ?? 0) + 1);
@@ -71,12 +105,26 @@ function CatalogTable({ kind, onEdit, onArchive, onRestore }: { kind: Kind; onEd
     {
       key: "name",
       header: "Name",
-      sortValue: (e) => e.name.toLowerCase(),
-      cell: (e) => (
-        <button type="button" onClick={() => onEdit(e)} className="rounded text-left font-semibold text-ink hover:text-brand focus-visible:outline-2 focus-visible:outline-brand-action" disabled={e.status === "archived"}>
-          {e.name}
-        </button>
-      ),
+      // Subcategories sort under their parent.
+      sortValue: (e) => `${(parentOf(e)?.name ?? e.name).toLowerCase()}|${parentOf(e) ? e.name.toLowerCase() : ""}`,
+      cell: (e) => {
+        const parent = parentOf(e);
+        return (
+          <span className={cn("flex items-center gap-1.5", parent && "pl-4")}>
+            {parent && (
+              <span className="text-ink-faint" aria-hidden>
+                └
+              </span>
+            )}
+            <span className="min-w-0">
+              <button type="button" onClick={() => onEdit(e)} className="rounded text-left font-semibold text-ink hover:text-brand focus-visible:outline-2 focus-visible:outline-brand-action" disabled={e.status === "archived"}>
+                {e.name}
+              </button>
+              {parent && <span className="block text-[12px] leading-4 text-ink-muted">Subcategory of {parent.name}</span>}
+            </span>
+          </span>
+        );
+      },
     },
     { key: "description", header: "Description", cell: (e) => <span className="line-clamp-2 max-w-[420px] text-ink-muted">{e.description || "—"}</span> },
     {
@@ -106,7 +154,8 @@ function CatalogTable({ kind, onEdit, onArchive, onRestore }: { kind: Kind; onEd
           label={`Actions for ${e.name}`}
           actions={[
             e.status === "active" && { label: "Edit", icon: PencilSimpleIcon, onSelect: () => onEdit(e) },
-            e.status === "active" ? { label: "Archive", icon: ArchiveIcon, onSelect: () => onArchive(e), destructive: true, separatorBefore: true } : { label: "Restore", icon: ArrowCounterClockwiseIcon, onSelect: () => onRestore(e) },
+            e.status === "active" ? { label: "Archive", icon: ArchiveIcon, onSelect: () => onArchive(e), separatorBefore: true } : { label: "Restore", icon: ArrowCounterClockwiseIcon, onSelect: () => onRestore(e) },
+            { label: "Delete", icon: TrashIcon, onSelect: () => onDelete(e), destructive: true },
           ]}
         />
       ),
@@ -154,6 +203,10 @@ export function CatalogView({ initialTab }: { initialTab?: string }) {
   const [tab, setTab] = useState<Kind>(initialTab === "brands" ? "brands" : "categories");
   const [editing, setEditing] = useState<{ kind: Kind; entry: CatalogEntry | null } | null>(null);
   const [archiving, setArchiving] = useState<{ kind: Kind; entry: CatalogEntry } | null>(null);
+  const [deleting, setDeleting] = useState<{ kind: Kind; entry: CatalogEntry } | null>(null);
+  const deleteCategory = useDeleteCatalogEntry("categories");
+  const deleteBrand = useDeleteCatalogEntry("brands");
+  const deletePending = deleteCategory.isPending || deleteBrand.isPending;
   const { data: categories } = useRecords("categories");
   const { data: brands } = useRecords("brands");
   const saveCategory = useSaveRecord("categories");
@@ -169,6 +222,17 @@ export function CatalogView({ initialTab }: { initialTab?: string }) {
       });
     } catch (e) {
       toast.error("Couldn't update", { description: e instanceof Error ? e.message : undefined });
+    }
+  };
+
+  const remove = async ({ kind, entry }: { kind: Kind; entry: CatalogEntry }) => {
+    try {
+      await (kind === "categories" ? deleteCategory : deleteBrand).mutateAsync(entry.id);
+      setDeleting(null);
+      toast.success(`${entry.name} deleted`, { description: SESSION_NOTE });
+    } catch (e) {
+      setDeleting(null);
+      toast.error(`Couldn't delete ${entry.name}`, { description: e instanceof Error ? e.message : undefined });
     }
   };
 
@@ -215,10 +279,11 @@ export function CatalogView({ initialTab }: { initialTab?: string }) {
           onEdit={(entry) => setEditing({ kind: tab, entry })}
           onArchive={(entry) => setArchiving({ kind: tab, entry })}
           onRestore={(entry) => void setStatus(tab, entry, "active")}
+          onDelete={(entry) => setDeleting({ kind: tab, entry })}
         />
       </Card>
 
-      {editing && <EntryDialog key={`${editing.kind}-${editing.entry?.id ?? "new"}`} kind={editing.kind} entry={editing.entry} onClose={() => setEditing(null)} />}
+      {editing && <CatalogEntryDialog key={`${editing.kind}-${editing.entry?.id ?? "new"}`} kind={editing.kind} entry={editing.entry} onClose={() => setEditing(null)} />}
       <ConfirmDialog
         open={!!archiving}
         onOpenChange={(o) => !o && setArchiving(null)}
@@ -233,6 +298,20 @@ export function CatalogView({ initialTab }: { initialTab?: string }) {
           if (archiving) void setStatus(archiving.kind, archiving.entry, "archived");
           setArchiving(null);
         }}
+      />
+      <ConfirmDialog
+        open={!!deleting}
+        onOpenChange={(o) => !o && setDeleting(null)}
+        title={`Delete this ${deleting ? NOUN[deleting.kind].one : ""}?`}
+        description={
+          <p>
+            <span className="font-medium text-ink">{deleting?.entry.name}</span> will be removed permanently. Only {deleting ? NOUN[deleting.kind].many : ""} that no item uses
+            {deleting?.kind === "categories" ? " and that have no subcategories" : ""} can be deleted; otherwise archive it instead.
+          </p>
+        }
+        confirmLabel="Delete"
+        pending={deletePending}
+        onConfirm={() => deleting && void remove(deleting)}
       />
     </PageShell>
   );

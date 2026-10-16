@@ -7,10 +7,10 @@
 import { addDays, nowIso } from "@/lib/format";
 import { available, OPEN_SO, PENDING_PO, PO_STATUSES, SO_STATUSES, stockStatusOf, toRow } from "@/lib/inventory-meta";
 import { DEMO_TODAY } from "@/lib/mock-data/movements";
-import { TAX_CLASSES } from "@/lib/mock-data/products";
+import { INVENTORY_ACCOUNTS, PURCHASE_ACCOUNTS, SALES_ACCOUNTS, TAX_CLASSES } from "@/lib/mock-data/products";
 import { VENDORS, WAREHOUSE_IDS, WAREHOUSES } from "@/lib/mock-data/warehouses";
 import { clone, collections, CURRENT_USER, delay, movements, products, settings } from "./store";
-import type { ItemInput, ItemQuery } from "@/lib/schemas/item";
+import type { ItemCreateExtras, ItemInput, ItemQuery } from "@/lib/schemas/item";
 import type {
   DashboardData,
   Lifecycle,
@@ -44,18 +44,59 @@ export class ApiError extends Error {
 export interface Lookups {
   warehouses: typeof WAREHOUSES;
   vendors: typeof VENDORS;
+  /** Active category names, each top-level category followed by its subcategories. */
   categories: string[];
+  /** Display label per category name: "Services › Installation" for subcategories. */
+  categoryLabels: Record<string, string>;
   brands: string[];
+  /** Manufacturers already used on items (Zoho's "select or add"). */
+  manufacturers: string[];
   units: string[];
   taxClasses: string[];
+  salesAccounts: string[];
+  purchaseAccounts: string[];
+  inventoryAccounts: string[];
+  /** Default valuation method for new items, from Settings. */
+  valuationMethod: "fifo" | "weighted-average";
+}
+
+/** Category names, parents first with their subcategories under them. */
+export function categoryTree(list = collections().categories) {
+  const active = list.filter((c) => c.status === "active");
+  const top = active.filter((c) => !c.parentId).sort((a, b) => a.name.localeCompare(b.name));
+  const labels: Record<string, string> = {};
+  const names: string[] = [];
+  for (const parent of top) {
+    names.push(parent.name);
+    labels[parent.name] = parent.name;
+    for (const child of active.filter((c) => c.parentId === parent.id).sort((a, b) => a.name.localeCompare(b.name))) {
+      names.push(child.name);
+      labels[child.name] = `${parent.name} › ${child.name}`;
+    }
+  }
+  return { names, labels };
 }
 
 /** Categories and brands come from Categories & Brands (active entries only); units from Settings. */
 export async function getLookups(): Promise<Lookups> {
   await delay(60);
-  const { categories, brands } = collections();
-  const names = (list: typeof categories) => list.filter((c) => c.status === "active").map((c) => c.name);
-  return clone({ warehouses: WAREHOUSES, vendors: VENDORS, categories: names(categories), brands: names(brands), units: settings().units, taxClasses: TAX_CLASSES });
+  const { brands } = collections();
+  const tree = categoryTree();
+  const manufacturers = [...new Set(products().map((p) => p.manufacturer).filter(Boolean))].sort();
+  return clone({
+    warehouses: WAREHOUSES,
+    vendors: VENDORS,
+    categories: tree.names,
+    categoryLabels: tree.labels,
+    brands: brands.filter((c) => c.status === "active").map((c) => c.name),
+    manufacturers,
+    units: settings().units,
+    taxClasses: TAX_CLASSES,
+    salesAccounts: SALES_ACCOUNTS,
+    purchaseAccounts: PURCHASE_ACCOUNTS,
+    inventoryAccounts: INVENTORY_ACCOUNTS,
+    valuationMethod: settings().costingMethod === "fifo" ? "fifo" : "weighted-average",
+  });
 }
 
 /** Every product with totals for a scope (archived included; callers filter). */
@@ -98,16 +139,24 @@ const SORT_KEY: Record<ItemQuery["sort"], (r: ProductRow) => string | number> = 
   updated: (r) => r.updatedAt,
 };
 
+/** A category and its subcategories: filtering by a parent includes its children. */
+function categoryFamily(name: string): Set<string> {
+  const list = collections().categories;
+  const parent = list.find((c) => c.name === name);
+  return new Set([name, ...(parent ? list.filter((c) => c.parentId === parent.id).map((c) => c.name) : [])]);
+}
+
 export function filterRows(rows: ProductRow[], q: ItemQuery): ProductRow[] {
   const term = q.q.trim().toLowerCase();
+  const family = q.category ? categoryFamily(q.category) : null;
   return rows.filter((r) => {
     if (q.lifecycle ? r.lifecycle !== q.lifecycle : r.lifecycle === "archived") return false;
-    if (term && ![r.name, r.sku, r.barcode].some((v) => v.toLowerCase().includes(term))) return false;
-    if (q.category && r.category !== q.category) return false;
+    if (term && ![r.name, r.sku, r.barcode, r.mpn].some((v) => v.toLowerCase().includes(term))) return false;
+    if (family && !family.has(r.category)) return false;
     if (q.brand && r.brand !== q.brand) return false;
     if (q.type && r.type !== q.type) return false;
-    // Stock status filters apply to active items; inactive ones are not replenished.
-    if (q.stock && (r.lifecycle !== "active" || r.stockStatus !== q.stock)) return false;
+    // Stock status filters apply to active tracked items; inactive ones are not replenished.
+    if (q.stock && (r.lifecycle !== "active" || !r.trackInventory || r.stockStatus !== q.stock)) return false;
     return true;
   });
 }
@@ -146,18 +195,66 @@ export async function getItemsByIds(ids: string[], scope: WarehouseScope): Promi
   return clone(products().filter((p) => set.has(p.id)).map((p) => toRow(p, scope)));
 }
 
+/** A related item as the details page lists it. */
+export type ItemRef = Pick<ProductRow, "id" | "name" | "sku" | "icon" | "image" | "unit" | "lifecycle" | "costPrice" | "sellingPrice" | "available" | "onHand" | "status" | "trackInventory" | "variantValues">;
+
 export interface ItemDetail {
   item: ProductRow;
   warehouses: (ProductRow["stock"][number] & { available: number; status: ReturnType<typeof stockStatusOf> })[];
+  /** Variant family: the parent (or this item) and every variant, parent first. Empty when the item has no variants. */
+  family: ItemRef[];
+  /** The attributes that define the family (from the parent). */
+  familyAttributes: Product["attributes"];
+  parent: ItemRef | null;
+  /** Composite items: each component with its quantity per unit. */
+  components: (ItemRef & { quantity: number })[];
+  /** Composite items that use this item as a component. */
+  usedIn: ItemRef[];
+  /** Why the item can't be deleted, or null when it can. */
+  deleteBlocker: string | null;
 }
+
+const ref = (p: Product): ItemRef => {
+  const r = toRow(p, "all");
+  return {
+    id: r.id,
+    name: r.name,
+    sku: r.sku,
+    icon: r.icon,
+    image: r.image,
+    unit: r.unit,
+    lifecycle: r.lifecycle,
+    costPrice: r.costPrice,
+    sellingPrice: r.sellingPrice,
+    available: r.available,
+    onHand: r.onHand,
+    status: r.status,
+    trackInventory: r.trackInventory,
+    variantValues: r.variantValues,
+  };
+};
 
 export async function getItem(id: string): Promise<ItemDetail> {
   await delay();
-  const p = products().find((x) => x.id === id);
+  const all = products();
+  const p = all.find((x) => x.id === id);
   if (!p) throw new ApiError("Item not found");
+  const parent = p.parentId ? all.find((x) => x.id === p.parentId) : undefined;
+  const head = parent ?? p;
+  const variants = all.filter((x) => x.parentId === head.id);
+  const family = head.attributes.length || variants.length ? [head, ...variants] : [];
   return clone({
     item: toRow(p, "all"),
     warehouses: p.stock.map((b) => ({ ...b, available: available(b), status: stockStatusOf(available(b), b.reorderPoint) })),
+    family: family.map(ref),
+    familyAttributes: head.attributes,
+    parent: parent ? ref(parent) : null,
+    components: p.components.flatMap((c) => {
+      const cp = all.find((x) => x.id === c.productId);
+      return cp ? [{ ...ref(cp), quantity: c.quantity }] : [];
+    }),
+    usedIn: all.filter((x) => x.components.some((c) => c.productId === id)).map(ref),
+    deleteBlocker: deleteBlocker(p),
   });
 }
 
@@ -177,64 +274,192 @@ const slug = (s: string) =>
     .replace(/^-|-$/g, "")
     .slice(0, 40) || "item";
 
+export const MAX_IMAGES = 15;
+
+/** Rules a backend would enforce whatever the form sent. */
+function checkInput(input: ItemInput, self: Product | null, parentId: string | null) {
+  if (input.images.length > MAX_IMAGES) throw new ApiError(`An item can have up to ${MAX_IMAGES} images`);
+  if (input.type === "service" && input.trackInventory) throw new ApiError("Services can't track inventory");
+  if (input.preferredVendorId && !VENDORS.some((v) => v.id === input.preferredVendorId)) throw new ApiError("Preferred vendor not found", "preferredVendorId");
+  if (input.type === "composite") {
+    for (const c of input.components) {
+      const cp = products().find((x) => x.id === c.productId);
+      if (!cp) throw new ApiError("A component item no longer exists", "components");
+      if (self && cp.id === self.id) throw new ApiError("A composite item can't contain itself", "components");
+      if (cp.type === "composite") throw new ApiError(`${cp.name} is a composite item: components must be goods or services`, "components");
+    }
+  }
+  // Only a top-level goods item defines variant attributes.
+  if (input.attributes.length && (input.type !== "goods" || parentId || self?.parentId)) throw new ApiError("Only goods items that aren't variants can define attributes");
+}
+
+/** Variant values must match the family's attributes and not repeat a sibling's combination. */
+function applyVariant(parent: Product, values: Record<string, string>, selfId?: string) {
+  const out: Record<string, string> = {};
+  for (const a of parent.attributes) {
+    const v = (values[a.name] ?? "").trim();
+    if (!v) throw new ApiError(`Choose a ${a.name.toLowerCase()}`, `variantValues.${a.name}`);
+    // New options typed on the variant form join the family's list.
+    const known = a.options.find((o) => o.toLowerCase() === v.toLowerCase());
+    if (!known) a.options.push(v);
+    out[a.name] = known ?? v;
+  }
+  const key = (vals: Record<string, string>) => parent.attributes.map((a) => (vals[a.name] ?? "").toLowerCase()).join("|");
+  const family = [parent, ...products().filter((x) => x.parentId === parent.id)];
+  const clash = family.find((x) => x.id !== selfId && key(x.variantValues) === key(out));
+  if (clash) throw new ApiError(`${clash.name} already has ${Object.values(out).join(" / ")}`, `variantValues.${parent.attributes[0].name}`);
+  return out;
+}
+
 /**
- * New items start with no stock in any warehouse: opening stock is a stock
- * transaction (goods receipt or adjustment), and those modules aren't built yet.
+ * Create an item. Tracked items can start with opening stock per warehouse,
+ * recorded as an "Opening stock" adjustment in the movement ledger (as Zoho
+ * does). A variant is created from its parent and joins the parent's family.
  */
-export async function createItem(input: ItemInput): Promise<ProductRow> {
+export async function createItem(input: ItemInput, extras: ItemCreateExtras = { openingStock: {}, openingRate: 0, parentId: null }): Promise<ProductRow> {
   await delay();
   assertUniqueSku(input.sku);
+  checkInput(input, null, extras.parentId);
+  const parent = extras.parentId ? products().find((x) => x.id === extras.parentId) : undefined;
+  if (extras.parentId && (!parent || parent.parentId || parent.type !== "goods")) throw new ApiError("Variants can only be added to goods items");
+
   let id = slug(input.name);
   // "new" is the create-item route.
   if (id === "new" || products().some((p) => p.id === id)) id = `${id}-${Date.now().toString(36)}`;
   const at = nowIso();
   // Split the item-level reorder point across warehouses as a starting point.
   const shares = [0.5, 0.3, 0.2];
+  const variantValues = parent ? applyVariant(parent, input.variantValues) : {};
   const p: Product = {
     id,
     ...input,
-    icon: "box",
-    stock: WAREHOUSE_IDS.map((warehouseId, i) => ({ warehouseId, onHand: 0, reserved: 0, reorderPoint: Math.round(input.reorderPoint * shares[i]) })),
-    suppliers: [],
+    type: parent ? "goods" : input.type,
+    attributes: parent ? [] : input.attributes,
+    variantValues: parent ? variantValues : input.attributes.length ? input.variantValues : {},
+    parentId: parent?.id ?? null,
+    image: input.images[0],
+    icon: parent?.icon ?? "box",
+    stock: WAREHOUSE_IDS.map((warehouseId, i) => ({
+      warehouseId,
+      onHand: input.trackInventory ? Math.max(0, Math.round(extras.openingStock[warehouseId] ?? 0)) : 0,
+      reserved: 0,
+      reorderPoint: Math.round(input.reorderPoint * shares[i]),
+    })),
+    suppliers: input.preferredVendorId ? [{ vendorId: input.preferredVendorId, supplierSku: input.sku, lastCost: input.costPrice, preferred: true }] : [],
     activity: [],
     createdAt: at,
     updatedAt: at,
   };
-  log(p, "created", "Item created");
+  log(p, "created", parent ? `Variant created from ${parent.name}` : "Item created");
+  if (input.images.length) log(p, "images", `Added ${input.images.length === 1 ? "1 image" : `${input.images.length} images`}`);
   products().unshift(p);
+  if (parent) {
+    log(parent, "variant", `Variant ${p.name} added`);
+    parent.updatedAt = at;
+  }
+
+  const opening = p.stock.filter((b) => b.onHand > 0);
+  opening.forEach((b, i) =>
+    movements().unshift({ id: newId("mv"), at, productId: p.id, type: "adjustment", quantity: b.onHand, from: null, to: b.warehouseId, reference: `Opening stock${opening.length > 1 ? ` ${i + 1}` : ""}`, user: CURRENT_USER }),
+  );
+  if (opening.length) log(p, "updated", `Opening stock of ${opening.reduce((s, b) => s + b.onHand, 0)} ${p.unit} at ${extras.openingRate.toFixed(2)} per unit`);
   return clone(toRow(p, "all"));
 }
 
 const FIELD_LABEL: Partial<Record<keyof ItemInput, string>> = {
   name: "name",
   sku: "SKU",
-  description: "description",
+  description: "sales description",
+  purchaseDescription: "purchase description",
   category: "category",
   brand: "brand",
-  type: "item type",
-  barcode: "barcode",
+  manufacturer: "manufacturer",
+  barcode: "UPC / EAN",
+  mpn: "MPN",
+  isbn: "ISBN",
+  hsnCode: "HSN / SAC code",
   unit: "unit",
-  taxClass: "tax class",
+  taxClass: "tax rate",
   reorderPoint: "reorder point",
+  returnable: "returnable",
+  salesAccount: "sales account",
+  purchaseAccount: "purchase account",
+  inventoryAccount: "inventory account",
+  preferredVendorId: "preferred vendor",
+  valuationMethod: "valuation method",
+  tracking: "advanced tracking",
+  sellable: "sales information",
+  purchasable: "purchase information",
+  dimensions: "dimensions",
+  weight: "weight",
+  components: "components",
+  attributes: "variant attributes",
+  variantValues: "variant values",
 };
+
+const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+
+function imageChangeText(before: string[], after: string[]) {
+  const added = after.filter((x) => !before.includes(x)).length;
+  const removed = before.filter((x) => !after.includes(x)).length;
+  const parts: string[] = [];
+  if (added) parts.push(`added ${added === 1 ? "1 image" : `${added} images`}`);
+  if (removed) parts.push(`removed ${removed === 1 ? "1 image" : `${removed} images`}`);
+  if (!parts.length && before[0] !== after[0]) parts.push("changed the primary image");
+  else if (!parts.length) parts.push("reordered images");
+  const text = parts.join(" and ");
+  return text[0].toUpperCase() + text.slice(1);
+}
 
 export async function updateItem(id: string, input: ItemInput): Promise<ProductRow> {
   await delay();
   const p = products().find((x) => x.id === id);
   if (!p) throw new ApiError("Item not found");
   if (p.lifecycle === "archived") throw new ApiError("Restore this item before editing it");
+  // As in Zoho, the type and inventory tracking are fixed once the item exists.
+  if (input.type !== p.type) throw new ApiError("An item's type can't be changed after it's created");
+  if (input.trackInventory !== p.trackInventory) throw new ApiError("Inventory tracking can't be turned on or off after the item is created");
   assertUniqueSku(input.sku, id);
+  checkInput(input, p, p.parentId);
+  const parent = p.parentId ? products().find((x) => x.id === p.parentId) : undefined;
+  const variantValues = parent ? applyVariant(parent, input.variantValues, p.id) : input.attributes.length ? input.variantValues : {};
+  // Removing an attribute the variants still use would orphan them.
+  if (!parent && products().some((x) => x.parentId === p.id)) {
+    const kept = new Set(input.attributes.map((a) => a.name));
+    const lost = p.attributes.find((a) => !kept.has(a.name));
+    if (lost) throw new ApiError(`${lost.name} is used by this item's variants and can't be removed`, "attributes");
+  }
 
-  const changed = (Object.keys(FIELD_LABEL) as (keyof ItemInput)[]).filter((k) => p[k] !== input[k]).map((k) => FIELD_LABEL[k]!);
+  const changed = (Object.keys(FIELD_LABEL) as (keyof ItemInput)[]).filter((k) => !same(p[k as keyof Product], k === "variantValues" ? variantValues : input[k])).map((k) => FIELD_LABEL[k]!);
   const priceChanges: string[] = [];
   if (p.costPrice !== input.costPrice) priceChanges.push("cost price");
   if (p.sellingPrice !== input.sellingPrice) priceChanges.push("selling price");
   const statusChanged = p.lifecycle !== input.lifecycle;
+  const imagesChanged = !same(p.images, input.images);
+  const before = p.images;
 
-  Object.assign(p, input, { updatedAt: nowIso() });
+  Object.assign(p, input, { variantValues, image: input.images[0], updatedAt: nowIso() });
+  if (input.preferredVendorId && !p.suppliers.some((s) => s.vendorId === input.preferredVendorId)) {
+    p.suppliers.push({ vendorId: input.preferredVendorId, supplierSku: p.sku, lastCost: p.costPrice, preferred: false });
+  }
+  p.suppliers.forEach((s) => (s.preferred = s.vendorId === input.preferredVendorId));
   if (changed.length) log(p, "updated", `Updated ${changed.join(", ")}`);
   if (priceChanges.length) log(p, "price", `Changed ${priceChanges.join(" and ")}`);
+  if (imagesChanged) log(p, "images", imageChangeText(before, input.images));
   if (statusChanged) log(p, "status", `Status changed to ${input.lifecycle === "active" ? "Active" : "Inactive"}`);
+  return clone(toRow(p, "all"));
+}
+
+/** Replace an item's images (primary first) without opening the full edit form. */
+export async function updateItemImages(id: string, images: string[]): Promise<ProductRow> {
+  await delay();
+  const p = products().find((x) => x.id === id);
+  if (!p) throw new ApiError("Item not found");
+  if (p.lifecycle === "archived") throw new ApiError("Restore this item before changing its images");
+  if (images.length > MAX_IMAGES) throw new ApiError(`An item can have up to ${MAX_IMAGES} images`);
+  if (same(p.images, images)) return clone(toRow(p, "all"));
+  log(p, "images", imageChangeText(p.images, images));
+  Object.assign(p, { images: [...images], image: images[0], updatedAt: nowIso() });
   return clone(toRow(p, "all"));
 }
 
@@ -255,6 +480,56 @@ export async function setLifecycle(ids: string[], lifecycle: Extract<Lifecycle, 
     n++;
   }
   return n;
+}
+
+/** Documents that list products on their lines, with a label for messages. */
+const DOC_LABEL: Partial<Record<keyof ReturnType<typeof collections>, string>> = {
+  purchaseOrders: "purchase orders",
+  goodsReceipts: "goods receipts",
+  salesOrders: "sales orders",
+  fulfilments: "fulfilments",
+  salesReturns: "sales returns",
+  transfers: "stock transfers",
+  adjustments: "stock adjustments",
+  stocktakes: "stocktakes",
+};
+
+/**
+ * As in Zoho, an item that has been used in transactions can't be deleted —
+ * only marked inactive or archived — so its history stays intact.
+ */
+function deleteBlocker(p: Product): string | null {
+  const all = products();
+  if (all.some((x) => x.parentId === p.id)) return "It has variants. Delete the variants first.";
+  const composite = all.find((x) => x.components.some((c) => c.productId === p.id));
+  if (composite) return `It's a component of ${composite.name}.`;
+  if (p.stock.some((b) => b.onHand > 0 || b.reserved > 0)) return "It has stock on hand.";
+  const c = collections();
+  for (const [kind, label] of Object.entries(DOC_LABEL) as [keyof typeof c, string][]) {
+    const list = c[kind] as { lines?: { productId: string }[] }[];
+    if (list.some((d) => d.lines?.some((l) => l.productId === p.id))) return `It's used on ${label}.`;
+  }
+  if (movements().some((m) => m.productId === p.id && !m.reference.startsWith("Opening stock"))) return "It has stock transactions.";
+  return null;
+}
+
+/** Permanently delete items with no history. Throws (and deletes nothing) if any is blocked. */
+export async function deleteItems(ids: string[]): Promise<number> {
+  await delay();
+  const list = products();
+  const targets = list.filter((p) => ids.includes(p.id));
+  // Deleting a parent together with all its variants is fine: check the rest of the catalogue.
+  for (const p of targets) {
+    const others = (x: Product) => !ids.includes(x.id);
+    if (list.some((x) => others(x) && x.parentId === p.id)) throw new ApiError(`${p.name} can't be deleted: it has variants. Delete the variants first.`);
+    const reason = deleteBlocker({ ...p, id: p.id });
+    if (reason && !reason.startsWith("It has variants")) throw new ApiError(`${p.name} can't be deleted: ${reason[0].toLowerCase()}${reason.slice(1)}`);
+  }
+  const set = new Set(targets.map((p) => p.id));
+  for (let i = list.length - 1; i >= 0; i--) if (set.has(list[i].id)) list.splice(i, 1);
+  const ledger = movements();
+  for (let i = ledger.length - 1; i >= 0; i--) if (set.has(ledger[i].productId)) ledger.splice(i, 1);
+  return set.size;
 }
 
 // ── Movements ────────────────────────────────────────────────────────
@@ -281,13 +556,13 @@ export async function getDashboard(scope: WarehouseScope, days: number): Promise
   const whs: WarehouseId[] = scope === "all" ? WAREHOUSE_IDS : [scope];
   const alerts: LowStockAlert[] = [];
   for (const p of all) {
-    if (p.lifecycle !== "active") continue;
+    if (p.lifecycle !== "active" || !p.trackInventory) continue;
     for (const b of p.stock) {
       if (!whs.includes(b.warehouseId) || b.reorderPoint <= 0) continue;
       const avail = available(b);
       const status = stockStatusOf(avail, b.reorderPoint);
       if (status === "in-stock") continue;
-      alerts.push({ productId: p.id, name: p.name, sku: p.sku, icon: p.icon, warehouseId: b.warehouseId, available: avail, reorderPoint: b.reorderPoint, status });
+      alerts.push({ productId: p.id, name: p.name, sku: p.sku, icon: p.icon, image: p.image, warehouseId: b.warehouseId, available: avail, reorderPoint: b.reorderPoint, status });
     }
   }
   alerts.sort((a, b) => a.available / a.reorderPoint - b.available / b.reorderPoint || b.reorderPoint - a.reorderPoint);
@@ -312,7 +587,7 @@ export async function getDashboard(scope: WarehouseScope, days: number): Promise
   const topSellers: TopSeller[] = [...sold.entries()]
     .map(([productId, quantity]) => {
       const p = byId.get(productId)!;
-      return { productId, name: p.name, sku: p.sku, icon: p.icon, quantity, revenue: quantity * p.sellingPrice };
+      return { productId, name: p.name, sku: p.sku, icon: p.icon, image: p.image, quantity, revenue: quantity * p.sellingPrice };
     })
     .sort((a, b) => b.quantity - a.quantity)
     .slice(0, 5);
@@ -362,7 +637,7 @@ export async function getDashboard(scope: WarehouseScope, days: number): Promise
     purchaseOrders,
     salesOrders,
     recentMovements: ranged.slice(0, 6),
-    movementProducts: Object.fromEntries(ranged.slice(0, 6).map((m) => [m.productId, { name: byId.get(m.productId)!.name, icon: byId.get(m.productId)!.icon }])),
+    movementProducts: Object.fromEntries(ranged.slice(0, 6).map((m) => [m.productId, { name: byId.get(m.productId)!.name, icon: byId.get(m.productId)!.icon, image: byId.get(m.productId)!.image }])),
     warehouses,
     topSellers,
   });
@@ -370,12 +645,12 @@ export async function getDashboard(scope: WarehouseScope, days: number): Promise
 
 // ── Global search (header) ───────────────────────────────────────────
 
-export async function searchItems(term: string): Promise<Pick<Product, "id" | "name" | "sku" | "icon" | "lifecycle">[]> {
+export async function searchItems(term: string): Promise<Pick<Product, "id" | "name" | "sku" | "icon" | "image" | "lifecycle">[]> {
   await delay(60);
   const t = term.trim().toLowerCase();
   if (!t) return [];
   return products()
     .filter((p) => [p.name, p.sku, p.barcode].some((v) => v.toLowerCase().includes(t)))
     .slice(0, 6)
-    .map(({ id, name, sku, icon, lifecycle }) => ({ id, name, sku, icon, lifecycle }));
+    .map(({ id, name, sku, icon, image, lifecycle }) => ({ id, name, sku, icon, image, lifecycle }));
 }

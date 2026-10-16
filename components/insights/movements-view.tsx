@@ -89,7 +89,7 @@ export function MovementsView({ initialQuery = "" }: { initialQuery?: string }) 
         const p = byId.get(m.productId);
         return (
           <span className="flex min-w-[190px] items-center gap-2.5">
-            {p && <ProductThumb icon={p.icon} size={28} />}
+            {p && <ProductThumb icon={p.icon} src={p.image} size={28} />}
             <TextLink href={itemHref(m.productId)} className="truncate">
               {p?.name ?? m.productId}
             </TextLink>

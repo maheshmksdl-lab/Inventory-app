@@ -14,6 +14,7 @@ import {
   PackageIcon,
   PlusIcon,
   ProhibitIcon,
+  TrashIcon,
   UploadSimpleIcon,
   WarningIcon,
   XIcon,
@@ -38,7 +39,7 @@ import { ITEMS_ROUTE, itemHref, NEW_ITEM_ROUTE, setItemsListHref } from "@/lib/r
 import { DEFAULT_ITEM_QUERY, itemQueryString, PAGE_SIZES, parseItemQuery, type ItemQuery, type ItemSort } from "@/lib/schemas/item";
 import type { ProductRow, WarehouseScope } from "@/lib/types/inventory";
 import { cn } from "@/lib/utils";
-import { ItemRowMenu, useArchiveFlow } from "./item-actions";
+import { ItemRowMenu, useArchiveFlow, useDeleteFlow } from "./item-actions";
 
 /** List state lives in the URL, so filters survive refresh, Back, and links from the dashboard. */
 function useItemQuery() {
@@ -64,15 +65,18 @@ const hasFilters = (q: ItemQuery) => !!(q.q || q.category || q.brand || q.stock 
 function exportRows(rows: ProductRow[], scope: WarehouseScope) {
   downloadCsv(
     `evoq-inventory-items-${toIsoDate(new Date())}.csv`,
-    ["Name", "SKU", "Barcode", "Category", "Brand", "Type", "Unit", "Warehouse", "On hand", "Reserved", "Available", "Reorder point", "Cost price", "Selling price", "Status"],
+    ["Name", "SKU", "UPC / EAN", "Category", "Brand", "Manufacturer", "Type", "Unit", "HSN / SAC", "Track inventory", "Warehouse", "On hand", "Reserved", "Available", "Reorder point", "Cost price", "Selling price", "Status"],
     rows.map((r) => [
       r.name,
       r.sku,
       r.barcode,
       r.category,
       r.brand,
+      r.manufacturer,
       ITEM_TYPE_LABEL[r.type],
       r.unit,
+      r.hsnCode,
+      r.trackInventory ? "Yes" : "No",
       scope === "all" ? "All warehouses" : warehouseName(scope),
       r.onHand,
       r.reserved,
@@ -116,7 +120,7 @@ function SummaryTile({ icon: IconCmp, label, value, active, onClick, tone }: { i
 // ── Toolbar ──────────────────────────────────────────────────────────
 
 const STOCK_OPTIONS = (["in-stock", "low-stock", "out-of-stock"] as const).map((v) => ({ value: v, label: STATUS_META[v].label }));
-const TYPE_OPTIONS = (["stocked", "consumable", "bundle"] as const).map((v) => ({ value: v, label: ITEM_TYPE_LABEL[v] }));
+const TYPE_OPTIONS = (["goods", "service", "composite"] as const).map((v) => ({ value: v, label: ITEM_TYPE_LABEL[v] }));
 const LIFECYCLE_OPTIONS = (["active", "inactive", "archived"] as const).map((v) => ({ value: v, label: LIFECYCLE_LABEL[v] }));
 
 function Toolbar({ query, update }: { query: ItemQuery; update: (p: Partial<ItemQuery>) => void }) {
@@ -125,7 +129,7 @@ function Toolbar({ query, update }: { query: ItemQuery; update: (p: Partial<Item
   return (
     <div className="flex flex-col gap-2.5 px-4 pt-4 pb-3 sm:px-5">
       <div className="flex flex-wrap items-center gap-2">
-        <SearchInput value={query.q} onChange={onSearch} placeholder="Search by name, SKU or barcode…" label="Search items" className="w-full sm:w-[300px] sm:flex-none" />
+        <SearchInput value={query.q} onChange={onSearch} placeholder="Search by name, SKU, barcode or MPN…" label="Search items" className="w-full sm:w-[300px] sm:flex-none" />
         <WarehouseSelect className="w-full sm:w-auto" />
         {hasFilters(query) && (
           <OutlineButton icon={XIcon} onClick={() => update({ ...DEFAULT_ITEM_QUERY, sort: query.sort, dir: query.dir, size: query.size })} className="ml-auto">
@@ -189,6 +193,14 @@ function SortHeader({ label, sort, query, update, numeric, className }: { label:
   );
 }
 
+/** Type, plus a variant's values: "Goods · Colour: Grey". */
+const subtitle = (r: ProductRow) => {
+  const values = Object.values(r.variantValues);
+  return r.parentId && values.length ? `Variant · ${values.join(" / ")}` : ITEM_TYPE_LABEL[r.type];
+};
+
+const stockCell = (r: ProductRow, n: number) => (r.trackInventory ? formatNumber(n) : <span className="text-ink-faint" title="Inventory isn't tracked for this item">—</span>);
+
 type Selection = { selected: Set<string>; toggle: (id: string) => void; setMany: (ids: string[], on: boolean) => void };
 
 function ItemTable({
@@ -199,6 +211,7 @@ function ItemTable({
   onOpen,
   onArchive,
   onRestore,
+  onDelete,
 }: {
   rows: ProductRow[];
   query: ItemQuery;
@@ -207,6 +220,7 @@ function ItemTable({
   onOpen: (id: string) => void;
   onArchive: (r: ProductRow) => void;
   onRestore: (r: ProductRow) => void;
+  onDelete: (r: ProductRow) => void;
 }) {
   const pageIds = rows.map((r) => r.id);
   const selectedOnPage = pageIds.filter((id) => selection.selected.has(id)).length;
@@ -252,7 +266,7 @@ function ItemTable({
                 </td>
                 <td className={cn(td, stickyB, "pl-3")}>
                   <span className="flex min-w-0 items-center gap-3">
-                    <ProductThumb icon={r.icon} size={36} className={cn(muted && "opacity-60")} />
+                    <ProductThumb icon={r.icon} src={r.image} size={36} className={cn(muted && "opacity-60")} />
                     <span className="min-w-0">
                       <Link
                         href={itemHref(r.id)}
@@ -261,7 +275,7 @@ function ItemTable({
                       >
                         {r.name}
                       </Link>
-                      <span className="block text-[12px] leading-4 text-ink-muted">{ITEM_TYPE_LABEL[r.type]}</span>
+                      <span className="block max-w-[220px] truncate text-[12px] leading-4 text-ink-muted">{subtitle(r)}</span>
                     </span>
                   </span>
                 </td>
@@ -270,17 +284,17 @@ function ItemTable({
                   <span className="block">{r.category}</span>
                   <span className="block text-[12px] leading-4 text-ink-muted">{r.brand}</span>
                 </td>
-                <td className={cn(td, "text-right tabular-nums")}>{formatNumber(r.onHand)}</td>
-                <td className={cn(td, "text-right tabular-nums")}>{formatNumber(r.reserved)}</td>
-                <td className={cn(td, "text-right font-semibold text-ink tabular-nums")}>{formatNumber(r.available)}</td>
-                <td className={cn(td, "text-right tabular-nums")}>{formatNumber(r.scopeReorderPoint)}</td>
-                <td className={cn(td, "text-right whitespace-nowrap tabular-nums")}>{formatCurrency(r.costPrice)}</td>
-                <td className={cn(td, "text-right whitespace-nowrap text-ink tabular-nums")}>{formatCurrency(r.sellingPrice)}</td>
+                <td className={cn(td, "text-right tabular-nums")}>{stockCell(r, r.onHand)}</td>
+                <td className={cn(td, "text-right tabular-nums")}>{stockCell(r, r.reserved)}</td>
+                <td className={cn(td, "text-right font-semibold text-ink tabular-nums")}>{stockCell(r, r.available)}</td>
+                <td className={cn(td, "text-right tabular-nums")}>{stockCell(r, r.scopeReorderPoint)}</td>
+                <td className={cn(td, "text-right whitespace-nowrap tabular-nums")}>{r.purchasable ? formatCurrency(r.costPrice) : <span className="text-ink-faint">—</span>}</td>
+                <td className={cn(td, "text-right whitespace-nowrap text-ink tabular-nums")}>{r.sellable ? formatCurrency(r.sellingPrice) : <span className="text-ink-faint">—</span>}</td>
                 <td className={td}>
                   <StatusBadge status={r.status} />
                 </td>
                 <td className={cn(td, "text-right")} onClick={(e) => e.stopPropagation()}>
-                  <ItemRowMenu item={r} onArchive={() => onArchive(r)} onRestore={() => onRestore(r)} />
+                  <ItemRowMenu item={r} onArchive={() => onArchive(r)} onRestore={() => onRestore(r)} onDelete={() => onDelete(r)} />
                 </td>
               </tr>
             );
@@ -292,13 +306,25 @@ function ItemTable({
 }
 
 /** Phones: one compact card per item instead of the wide table. */
-function ItemCards({ rows, selection, onArchive, onRestore }: { rows: ProductRow[]; selection: Selection; onArchive: (r: ProductRow) => void; onRestore: (r: ProductRow) => void }) {
+function ItemCards({
+  rows,
+  selection,
+  onArchive,
+  onRestore,
+  onDelete,
+}: {
+  rows: ProductRow[];
+  selection: Selection;
+  onArchive: (r: ProductRow) => void;
+  onRestore: (r: ProductRow) => void;
+  onDelete: (r: ProductRow) => void;
+}) {
   return (
     <ul className="divide-y divide-line-soft border-t border-line-soft md:hidden">
       {rows.map((r) => (
         <li key={r.id} className={cn("relative flex gap-3 px-4 py-3.5", selection.selected.has(r.id) && "bg-brand-surface")}>
           <Checkbox aria-label={`Select ${r.name}`} checked={selection.selected.has(r.id)} onCheckedChange={() => selection.toggle(r.id)} className="relative z-10 mt-2.5" />
-          <ProductThumb icon={r.icon} size={40} />
+          <ProductThumb icon={r.icon} src={r.image} size={40} />
           <div className="min-w-0 flex-1">
             <div className="flex items-start gap-2">
               <Link href={itemHref(r.id)} className="min-w-0 flex-1 rounded after:absolute after:inset-0 focus-visible:outline-2 focus-visible:outline-brand-action">
@@ -306,15 +332,21 @@ function ItemCards({ rows, selection, onArchive, onRestore }: { rows: ProductRow
                 <span className="block font-mono text-[12px] leading-4 text-ink-muted">{r.sku}</span>
               </Link>
               <div className="relative z-10 -mt-1 -mr-1">
-                <ItemRowMenu item={r} onArchive={() => onArchive(r)} onRestore={() => onRestore(r)} />
+                <ItemRowMenu item={r} onArchive={() => onArchive(r)} onRestore={() => onRestore(r)} onDelete={() => onDelete(r)} />
               </div>
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[12.5px] text-ink-body">
               <StatusBadge status={r.status} />
-              <span>
-                <span className="font-semibold text-ink tabular-nums">{formatNumber(r.available)}</span> available
-              </span>
-              <span className="text-ink-muted tabular-nums">{formatNumber(r.onHand)} on hand</span>
+              {r.trackInventory ? (
+                <>
+                  <span>
+                    <span className="font-semibold text-ink tabular-nums">{formatNumber(r.available)}</span> available
+                  </span>
+                  <span className="text-ink-muted tabular-nums">{formatNumber(r.onHand)} on hand</span>
+                </>
+              ) : (
+                <span className="text-ink-muted">{ITEM_TYPE_LABEL[r.type]}</span>
+              )}
               <span className="ml-auto font-medium text-ink tabular-nums">{formatCurrency(r.sellingPrice)}</span>
             </div>
           </div>
@@ -383,6 +415,7 @@ export function ItemsView() {
   const data = hydrated ? fetched : undefined;
   const router = useRouter();
   const archive = useArchiveFlow();
+  const remove = useDeleteFlow((ids, label) => archive.ask(ids, label));
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [exporting, setExporting] = useState(false);
 
@@ -488,6 +521,13 @@ export function ItemsView() {
               >
                 Archive
               </OutlineButton>
+              <OutlineButton
+                icon={TrashIcon}
+                className="h-8 hover:border-[#FDA29B] hover:bg-[#FEF3F2] hover:text-[#B42318]"
+                onClick={() => remove.ask(selectedIds, selected.size === 1 ? (data?.items.find((r) => selected.has(r.id))?.name ?? "1 item") : pluralize(selected.size, "item"))}
+              >
+                Delete
+              </OutlineButton>
               <OutlineButton icon={XIcon} className="h-8" onClick={() => setSelected(new Set())}>
                 Clear
               </OutlineButton>
@@ -526,8 +566,9 @@ export function ItemsView() {
               onOpen={(id) => router.push(itemHref(id))}
               onArchive={(r) => archive.ask([r.id], r.name)}
               onRestore={(r) => archive.restore([r.id], r.name)}
+              onDelete={(r) => remove.ask([r.id], r.name)}
             />
-            <ItemCards rows={data.items} selection={selection} onArchive={(r) => archive.ask([r.id], r.name)} onRestore={(r) => archive.restore([r.id], r.name)} />
+            <ItemCards rows={data.items} selection={selection} onArchive={(r) => archive.ask([r.id], r.name)} onRestore={(r) => archive.restore([r.id], r.name)} onDelete={(r) => remove.ask([r.id], r.name)} />
             <div className="border-t border-line-soft px-4 py-3 sm:px-5">
               <Pagination
                 page={data.page}
@@ -544,6 +585,7 @@ export function ItemsView() {
         )}
       </Card>
       {archive.dialog((ids) => selection.setMany(ids, false))}
+      {remove.dialog((ids) => selection.setMany(ids, false))}
     </PageShell>
   );
 }

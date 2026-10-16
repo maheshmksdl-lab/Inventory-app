@@ -48,6 +48,14 @@ function beforeSave<K extends CollectionKey>(kind: K, rec: RecordOf<K>, previous
       assertUnique(kind, rec, "name" as never, kind === "categories" ? "Category" : "Brand");
       const prev = previous as RecordOf<"categories"> | undefined;
       const next = rec as RecordOf<"categories">;
+      if (kind === "categories" && next.parentId) {
+        // One level of nesting: the parent must be a top-level category, and a parent can't become a child.
+        const parent = collections().categories.find((c) => c.id === next.parentId);
+        if (!parent || parent.id === next.id) throw new ApiError("Choose a different parent category", "parentId");
+        if (parent.parentId) throw new ApiError(`${parent.name} is itself a subcategory`, "parentId");
+        if (collections().categories.some((c) => c.parentId === next.id)) throw new ApiError("This category has subcategories, so it can't sit under another one", "parentId");
+      }
+      if (kind === "brands") delete next.parentId;
       // Products refer to categories and brands by name: carry a rename through.
       if (prev && prev.name !== next.name) {
         const field = kind === "categories" ? "category" : "brand";
@@ -109,6 +117,24 @@ export async function saveRecord<K extends CollectionKey>(kind: K, input: Record
   if (idx >= 0) list[idx] = rec;
   else list.unshift(rec);
   return clone(rec);
+}
+
+/**
+ * Permanently delete a category or brand. Only unused entries can go: one that
+ * items still refer to (archived items included) or that has subcategories
+ * must be archived instead, so item history keeps its grouping.
+ */
+export async function deleteCatalogEntry(kind: "categories" | "brands", id: string): Promise<void> {
+  await delay();
+  const list = collections()[kind];
+  const idx = list.findIndex((c) => c.id === id);
+  if (idx < 0) throw new ApiError("Record not found");
+  const entry = list[idx];
+  const field = kind === "categories" ? "category" : "brand";
+  const used = products().filter((p) => p[field] === entry.name).length;
+  if (used) throw new ApiError(`${entry.name} is used by ${used === 1 ? "1 item" : `${used} items`}. Move them first, or archive it instead.`);
+  if (kind === "categories" && list.some((c) => c.parentId === id)) throw new ApiError(`${entry.name} has subcategories. Delete or move them first.`);
+  list.splice(idx, 1);
 }
 
 /** Preview the number a new document will get (shown on create forms). */

@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { inventoryKeys } from "@/hooks/use-inventory";
 import { useHydrated } from "@/hooks/use-hydrated";
 import { listMovements, listProducts } from "@/lib/api/inventory";
-import { getRecord, getSettings, listRecords, peekNumber, saveRecord, saveSettings, type CollectionKey, type RecordOf } from "@/lib/api/operations";
+import { deleteCatalogEntry, getRecord, getSettings, listRecords, peekNumber, saveRecord, saveSettings, type CollectionKey, type RecordOf } from "@/lib/api/operations";
 import type { WarehouseScope } from "@/lib/types/inventory";
 import type { AppSettings } from "@/lib/types/operations";
 
@@ -65,6 +65,11 @@ function useInvalidate() {
 export function useSaveRecord<K extends CollectionKey>(kind: K) {
   const invalidate = useInvalidate();
   return useMutation({ mutationFn: (rec: RecordOf<K>) => saveRecord(kind, rec), onSuccess: invalidate });
+}
+
+export function useDeleteCatalogEntry(kind: "categories" | "brands") {
+  const invalidate = useInvalidate();
+  return useMutation({ mutationFn: (id: string) => deleteCatalogEntry(kind, id), onSuccess: invalidate });
 }
 
 export function useSaveSettings() {

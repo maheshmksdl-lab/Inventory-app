@@ -54,7 +54,8 @@ export function seedDocuments(products: Product[], movements: StockMovement[], c
   const int = (min: number, max: number) => min + Math.floor(rand() * (max - min + 1));
   const pick = <T,>(arr: T[]) => arr[Math.floor(rand() * arr.length)];
   const byId = new Map(products.map((p) => [p.id, p]));
-  const active = products.filter((p) => p.lifecycle === "active");
+  // Services have no stock to order, receive or move.
+  const active = products.filter((p) => p.lifecycle === "active" && p.trackInventory);
   const preferredVendor = (p: Product) => p.suppliers.find((s) => s.preferred)?.vendorId ?? p.suppliers[0]?.vendorId ?? VENDORS[0].id;
   const costFrom = (p: Product, vendorId: string) => p.suppliers.find((s) => s.vendorId === vendorId)?.lastCost ?? p.costPrice;
   const vendorProducts = (vendorId: string, except?: string) => active.filter((p) => p.id !== except && p.suppliers.some((s) => s.vendorId === vendorId));

@@ -75,7 +75,7 @@ export function LowStockAlerts({ data, className }: { data: DashboardData | unde
                 <tr key={`${a.productId}-${a.warehouseId}`} className="border-b border-line-soft last:border-0">
                   <td className={cn(td, "py-2.5")}>
                     <Link href={itemHref(a.productId)} className="flex min-w-0 items-center gap-2.5 rounded focus-visible:outline-2 focus-visible:outline-brand-action">
-                      <ProductThumb icon={a.icon} size={30} />
+                      <ProductThumb icon={a.icon} src={a.image} size={30} />
                       <span className="min-w-0">
                         <span className="block truncate font-medium text-ink hover:text-brand">{a.name}</span>
                         <span className="block truncate text-[12px] leading-4 text-ink-muted">
@@ -286,7 +286,7 @@ export function TopSelling({ data, className }: { data: DashboardData | undefine
                 <tr key={t.productId} className="border-b border-line-soft last:border-0">
                   <td className={cn(td, "py-2.5")}>
                     <Link href={itemHref(t.productId)} className="flex min-w-0 items-center gap-2.5 rounded focus-visible:outline-2 focus-visible:outline-brand-action">
-                      <ProductThumb icon={t.icon} size={30} />
+                      <ProductThumb icon={t.icon} src={t.image} size={30} />
                       <span className="min-w-0">
                         <span className="block truncate font-medium text-ink hover:text-brand">{t.name}</span>
                         <span className="block truncate font-mono text-[11.5px] leading-4 text-ink-muted">{t.sku}</span>

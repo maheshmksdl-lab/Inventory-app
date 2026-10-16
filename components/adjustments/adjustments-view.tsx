@@ -214,7 +214,7 @@ export function AdjustmentsView({ startNew = false }: { startNew?: boolean }) {
         const p = byId.get(a.productId);
         return (
           <span className="flex min-w-[200px] items-center gap-3">
-            {p && <ProductThumb icon={p.icon} size={30} />}
+            {p && <ProductThumb icon={p.icon} src={p.image} size={30} />}
             <span className="min-w-0">
               <TextLink href={itemHref(a.productId)} className="block truncate">
                 {p?.name ?? a.productId}

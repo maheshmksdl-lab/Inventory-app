@@ -131,7 +131,7 @@ export function TransferDetailView({ id }: { id: string }) {
                       <tr key={l.productId} className="border-b border-line-soft last:border-0">
                         <td className={td}>
                           <span className="flex items-center gap-3">
-                            {p && <ProductThumb icon={p.icon} size={32} />}
+                            {p && <ProductThumb icon={p.icon} src={p.image} size={32} />}
                             <span className="min-w-0">
                               <TextLink href={itemHref(l.productId)} className="block truncate font-semibold">
                                 {p?.name ?? l.productId}

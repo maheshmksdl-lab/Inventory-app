@@ -158,7 +158,7 @@ export function VendorDetailView({ id }: { id: string }) {
                         <tr key={p.id} className="border-b border-line-soft last:border-0">
                           <td className={td}>
                             <span className="flex items-center gap-3">
-                              <ProductThumb icon={p.icon} size={30} />
+                              <ProductThumb icon={p.icon} src={p.image} size={30} />
                               <span className="min-w-0">
                                 <TextLink href={itemHref(p.id)} className="block truncate">
                                   {p.name}

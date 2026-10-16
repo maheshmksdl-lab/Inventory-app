@@ -1,8 +1,8 @@
 "use client";
 
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createItem, getDashboard, getItem, getLookups, listItemMovements, listItems, searchItems, setLifecycle, updateItem } from "@/lib/api/inventory";
-import type { ItemInput, ItemQuery } from "@/lib/schemas/item";
+import { createItem, deleteItems, getDashboard, getItem, getLookups, listItemMovements, listItems, searchItems, setLifecycle, updateItem, updateItemImages } from "@/lib/api/inventory";
+import type { ItemCreateExtras, ItemInput, ItemQuery } from "@/lib/schemas/item";
 import type { WarehouseScope } from "@/lib/types/inventory";
 
 export const inventoryKeys = {
@@ -23,8 +23,8 @@ export function useItems(query: ItemQuery, scope: WarehouseScope) {
   return useQuery({ queryKey: inventoryKeys.items(query, scope), queryFn: () => listItems(query, scope), placeholderData: keepPreviousData });
 }
 
-export function useItem(id: string) {
-  return useQuery({ queryKey: inventoryKeys.item(id), queryFn: () => getItem(id), retry: false });
+export function useItem(id: string, enabled = true) {
+  return useQuery({ queryKey: inventoryKeys.item(id), queryFn: () => getItem(id), retry: false, enabled });
 }
 
 export function useItemMovements(id: string, enabled = true) {
@@ -39,15 +39,15 @@ export function useItemSearch(term: string) {
   return useQuery({ queryKey: inventoryKeys.search(term), queryFn: () => searchItems(term), enabled: term.trim().length > 0, placeholderData: keepPreviousData });
 }
 
-/** Every inventory view reads the same store, so a change refreshes them all. */
+/** Every inventory view reads the same store, so a change refreshes them all (lookups list manufacturers too). */
 function useInvalidateAll() {
   const qc = useQueryClient();
-  return () => qc.invalidateQueries({ queryKey: inventoryKeys.all });
+  return () => Promise.all([qc.invalidateQueries({ queryKey: inventoryKeys.all }), qc.invalidateQueries({ queryKey: inventoryKeys.lookups })]);
 }
 
 export function useCreateItem() {
   const invalidate = useInvalidateAll();
-  return useMutation({ mutationFn: (input: ItemInput) => createItem(input), onSuccess: invalidate });
+  return useMutation({ mutationFn: ({ input, extras }: { input: ItemInput; extras?: ItemCreateExtras }) => createItem(input, extras), onSuccess: invalidate });
 }
 
 export function useUpdateItem(id: string) {
@@ -61,4 +61,14 @@ export function useSetLifecycle() {
     mutationFn: ({ ids, lifecycle }: { ids: string[]; lifecycle: "archived" | "active" }) => setLifecycle(ids, lifecycle),
     onSettled: invalidate,
   });
+}
+
+export function useUpdateItemImages(id: string) {
+  const invalidate = useInvalidateAll();
+  return useMutation({ mutationFn: (images: string[]) => updateItemImages(id, images), onSuccess: invalidate });
+}
+
+export function useDeleteItems() {
+  const invalidate = useInvalidateAll();
+  return useMutation({ mutationFn: (ids: string[]) => deleteItems(ids), onSuccess: invalidate });
 }

@@ -1,3 +1,4 @@
+import Image from "next/image";
 import type { Icon } from "@phosphor-icons/react";
 import {
   ArmchairIcon,
@@ -39,11 +40,15 @@ const ICONS: Record<ProductIconKey, Icon> = {
   box: CubeIcon,
 };
 
-/**
- * Neutral product image placeholder: the demo catalogue has no photos, so each
- * item shows a category glyph on a light tile. Swap for <Image> once products carry images.
- */
-export function ProductThumb({ icon, size = 36, className }: { icon: ProductIconKey; size?: number; className?: string }) {
+/** Square product thumbnail: its photo, or a category glyph on a light tile when it has none. */
+export function ProductThumb({ icon, src, size = 36, className }: { icon: ProductIconKey; src?: string; size?: number; className?: string }) {
+  if (src) {
+    return (
+      <span className={cn("relative block shrink-0 overflow-hidden rounded-lg border border-line-soft bg-[#F5F6F8]", className)} style={{ width: size, height: size }} aria-hidden>
+        <Image src={src} alt="" fill sizes={`${size * 2}px`} className="object-cover" />
+      </span>
+    );
+  }
   const IconCmp = ICONS[icon] ?? CubeIcon;
   return (
     <span

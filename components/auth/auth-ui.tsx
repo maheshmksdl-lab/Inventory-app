@@ -4,7 +4,7 @@ import { useState, type ComponentProps, type ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { CheckCircleIcon, CircleNotchIcon, EyeIcon, EyeSlashIcon, FlaskIcon, WarningCircleIcon } from "@phosphor-icons/react/dist/ssr";
-import { LOGO_SRC } from "@/components/layout/app-logo";
+import { LOGO_HEIGHT, LOGO_SRC, LOGO_WIDTH } from "@/components/layout/app-logo";
 import { fieldClass } from "@/components/shared/inventory-ui";
 import { cn } from "@/lib/utils";
 
@@ -17,7 +17,7 @@ export function AuthCard({ title, description, children, footer }: { title: stri
   return (
     <div className="w-full max-w-[420px]">
       <Link href="/login" className="mb-8 inline-flex rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-action" aria-label="EVOQ Inventory">
-        <Image src={LOGO_SRC} alt="EVOQ Inventory" width={176} height={48} priority className="h-11 w-auto" unoptimized />
+        <Image src={LOGO_SRC} alt="EVOQ Inventory" width={LOGO_WIDTH} height={LOGO_HEIGHT} priority className="h-11 w-auto" />
       </Link>
       <div className="rounded-2xl border border-line bg-white p-6 shadow-card sm:p-8">
         <h1 className="text-[24px] leading-8 font-semibold tracking-[-0.01em] text-ink">{title}</h1>

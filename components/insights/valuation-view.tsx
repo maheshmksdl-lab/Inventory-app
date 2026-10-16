@@ -55,7 +55,7 @@ export function ValuationView() {
       sortValue: (r) => r.p.name,
       cell: (r) => (
         <span className="flex min-w-[200px] items-center gap-3">
-          <ProductThumb icon={r.p.icon} size={30} />
+          <ProductThumb icon={r.p.icon} src={r.p.image} size={30} />
           <TextLink href={itemHref(r.p.id)} className="truncate">
             {r.p.name}
           </TextLink>

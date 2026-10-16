@@ -19,6 +19,8 @@ export interface CatalogEntry {
   id: string;
   name: string;
   description: string;
+  /** Categories only: the top-level category this one sits under (one level deep). */
+  parentId?: string;
   status: RecordStatus;
   createdAt: string;
 }

@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { CompassIcon } from "@phosphor-icons/react/dist/ssr";
-import { LOGO_SRC } from "@/components/layout/app-logo";
+import { LOGO_HEIGHT, LOGO_SRC, LOGO_WIDTH } from "@/components/layout/app-logo";
 import { EmptyState } from "@/components/shared/state-panels";
 
 /** Unmatched URLs render outside the app shell, so this page brings its own logo and way back. */
@@ -9,7 +9,7 @@ export default function NotFound() {
   return (
     <main id="main" className="flex min-h-dvh flex-col items-center justify-center bg-[#F8F9FB] p-6">
       <Link href="/dashboard" aria-label="EVOQ Inventory — go to Dashboard" className="mb-6 rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-action">
-        <Image src={LOGO_SRC} alt="EVOQ Inventory" width={176} height={48} className="h-10 w-auto" unoptimized />
+        <Image src={LOGO_SRC} alt="EVOQ Inventory" width={LOGO_WIDTH} height={LOGO_HEIGHT} className="h-10 w-auto" />
       </Link>
       <div className="w-full max-w-md rounded-2xl border border-line bg-white shadow-card">
         <EmptyState

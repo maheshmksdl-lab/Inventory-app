@@ -151,7 +151,7 @@ export function ReturnFormView({ soId: initialSo }: { soId?: string }) {
                         </td>
                         <td className={td}>
                           <span className="flex items-center gap-3">
-                            {p && <ProductThumb icon={p.icon} size={30} />}
+                            {p && <ProductThumb icon={p.icon} src={p.image} size={30} />}
                             <TextLink href={itemHref(r.productId)}>{p?.name}</TextLink>
                           </span>
                         </td>

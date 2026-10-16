@@ -51,7 +51,7 @@ export function WarehouseDetailView({ id }: { id: string }) {
       sortValue: (r) => r.p.name,
       cell: (r) => (
         <span className="flex min-w-[220px] items-center gap-3">
-          <ProductThumb icon={r.p.icon} size={32} />
+          <ProductThumb icon={r.p.icon} src={r.p.image} size={32} />
           <span className="min-w-0">
             <TextLink href={itemHref(r.p.id)} className="block truncate font-semibold">
               {r.p.name}
