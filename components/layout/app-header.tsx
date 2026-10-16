@@ -28,6 +28,7 @@ import { ITEMS_ROUTE, itemHref } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { LogoMark } from "./app-logo";
 import { navFor } from "./nav-config";
+import { LogoutDialog } from "./session";
 import { useShell } from "./shell-context";
 
 const toolClass =
@@ -207,7 +208,9 @@ function NotificationsMenu() {
 }
 
 function AccountMenu() {
+  const [loggingOut, setLoggingOut] = useState(false);
   return (
+    <>
     <DropdownMenu>
       <DropdownMenuTrigger
         aria-label="Account menu for Admin User"
@@ -244,11 +247,8 @@ function AccountMenu() {
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          {/* No session exists in this prototype: this only opens the demo sign-in screen. */}
-          <Link href="/login">
-            <SignOutIcon aria-hidden /> Go to sign-in screen (demo)
-          </Link>
+        <DropdownMenuItem onSelect={() => setLoggingOut(true)}>
+          <SignOutIcon aria-hidden /> Log out
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <p className="flex gap-2 px-2 py-1.5 text-[12px] leading-4 text-ink-muted">
@@ -257,6 +257,8 @@ function AccountMenu() {
         </p>
       </DropdownMenuContent>
     </DropdownMenu>
+    <LogoutDialog open={loggingOut} onOpenChange={setLoggingOut} />
+    </>
   );
 }
 

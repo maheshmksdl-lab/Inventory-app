@@ -1,5 +1,7 @@
-/** Where the app opens. */
+/** Where Log in lands. */
 export const HOME_ROUTE = "/dashboard";
+/** The app opens here, as EVOQ Projects does. */
+export const LOGIN_ROUTE = "/login";
 export const ITEMS_ROUTE = "/items";
 export const NEW_ITEM_ROUTE = "/items/new";
 
